@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 DNR = "https://gisagodnr.state.mi.us/arcgis/rest/services/DNR/DNRTrailsOPENDATA/FeatureServer"
 SCRAMBLE = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_ORV_Scramble_Areas/FeatureServer/1"
@@ -94,7 +95,11 @@ def main():
 
     fc = {"type": "FeatureCollection", "features": areas + features}
     (OUT / "trails.geojson").write_text(json.dumps(fc, separators=(",", ":")), encoding="utf-8")
-    meta = {"built": datetime.now().strftime("%Y-%m-%d %H:%M"), "segments": len(features),
+    try:
+        now = datetime.now(ZoneInfo("America/Detroit"))
+    except Exception:  # Windows without tzdata: local clock is Michigan anyway
+        now = datetime.now()
+    meta = {"built": now.strftime("%Y-%m-%d %H:%M"), "segments": len(features),
             "closures": sum(1 for f in features if f["properties"]["t"] == "closure")}
     (OUT / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
     size = (OUT / "trails.geojson").stat().st_size / 1e6

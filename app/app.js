@@ -275,6 +275,7 @@ function onPos(pos) {
   if (altitude != null) bits.push(`${Math.round(altitude * 3.281)} ft elev`);
   if (speed != null && speed > 0.5) bits.push(`${Math.round(speed * 2.237)} mph`);
   $('#scale-info').textContent = bits.join(' · ');
+  if (window.onTrackPos) window.onTrackPos(pos);
 }
 function onPosErr(err) {
   toast(err.code === 1 ? 'Location permission denied — allow it in your browser settings.' : 'No GPS fix yet…');
@@ -295,6 +296,9 @@ locBtn.addEventListener('click', () => {
   } else if (!follow) {
     follow = true;
     if (meMarker) map.setView(meMarker.getLatLng(), Math.max(map.getZoom(), 14));
+  } else if (window.isRecording && window.isRecording()) {
+    follow = false;
+    toast('GPS stays on while a ride is recording');
   } else {
     stopLocate();
   }

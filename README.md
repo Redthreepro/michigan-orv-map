@@ -7,6 +7,9 @@ MCCCT segment, scramble area, and current temporary closure/reroute.
 - **Map background** (USGS topo / satellite, public domain) caches automatically wherever you browse,
   or use the download button to save a whole area before you ride.
 - **GPS**: blue dot, follow mode, heading, speed, elevation — works offline.
+- **Ride recording**: record button tracks your ride (distance, time, avg mph), survives the app being
+  closed mid-ride, saves rides on the phone, exports GPX via the share sheet. Keep the app on screen
+  while recording — phones pause GPS for web apps in the background.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

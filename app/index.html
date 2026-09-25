@@ -22,7 +22,12 @@
   <ul id="results" hidden></ul>
 </div>
 
+<button id="rec-bar" hidden><i></i><span></span></button>
+
 <div id="fabs">
+  <button id="btn-rec" class="fab" aria-label="Record ride">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle class="dot" cx="12" cy="12" r="5" fill="currentColor"/></svg>
+  </button>
   <button id="btn-layers" class="fab" aria-label="Layers">
     <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
   </button>
@@ -90,9 +95,21 @@
   <button id="btn-save-go" class="primary">Download</button>
 </section>
 
+<!-- rides -->
+<section id="panel-rides" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <h2>Record a ride</h2>
+  <p class="hint" id="rec-live"></p>
+  <div id="rec-controls"></div>
+  <p class="hint">Keep the app open on screen while you ride. Phones stop GPS for web apps when the screen is off or you switch apps. The screen stays on while recording, so plug in if you can.</p>
+  <h2>Saved rides</h2>
+  <div id="ride-list"></div>
+</section>
+
 <div id="toast" hidden></div>
 
 <script src="vendor/leaflet.js"></script>
 <script src="app.js"></script>
+<script src="tracks.js"></script>
 </body>
 </html>
