@@ -2,14 +2,17 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    # nightly DNR closure refresh, ~6am Michigan time
+    - cron: "0 10 * * *"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,6 +21,22 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Pull latest DNR trail data
+        if: github.event_name != 'push'
+        run: python3 build.py
+      - name: Commit data if trails changed
+        if: github.event_name != 'push'
+        run: |
+          if git diff --quiet -- app/data/trails.geojson; then
+            # still deploys the fresh meta.json so the app shows when it was last checked
+            echo "No trail changes"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+            git add app/data
+            git commit -m "Nightly DNR trail data refresh"
+            git push
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

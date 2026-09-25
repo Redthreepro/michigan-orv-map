@@ -15,6 +15,6 @@ MCCCT segment, scramble area, and current temporary closure/reroute.
 python build.py
 ```
 
-Then commit and push `app/data/`. Phones pick up new data the next time they open the app with signal.
+This runs automatically every night at ~6am (GitHub Actions) and redeploys. Run it by hand only if you want a refresh right now, then commit and push `app/data/`.
 
 Data: Michigan DNR Trails Open Data (`DNRTrailsOPENDATA` FeatureServer). Basemap: USGS The National Map.
