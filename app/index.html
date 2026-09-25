@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Michigan ORV Map</title>
+<meta name="theme-color" content="#1b1f1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map"></div>
+
+<div id="topbar">
+  <input id="search" type="search" placeholder="Search trails & routes" autocomplete="off">
+  <span id="net" class="pill" hidden>Offline</span>
+  <ul id="results" hidden></ul>
+</div>
+
+<div id="fabs">
+  <button id="btn-layers" class="fab" aria-label="Layers">
+    <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+  <button id="btn-save" class="fab" aria-label="Save area offline">
+    <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button id="btn-locate" class="fab" aria-label="My location">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+  </button>
+</div>
+
+<div id="scale-info"></div>
+
+<!-- trail detail -->
+<section id="sheet" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <div id="sheet-body"></div>
+</section>
+
+<!-- layers + settings -->
+<section id="panel-layers" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <h2>Map</h2>
+  <div class="seg" id="base-seg">
+    <button data-base="topo" class="on">Topo</button>
+    <button data-base="sat">Satellite</button>
+  </div>
+  <h2>Show</h2>
+  <label class="row"><input type="checkbox" data-kind="route" checked><i class="sw route"></i>ORV routes <small>wider, most machines</small></label>
+  <label class="row"><input type="checkbox" data-kind="trail" checked><i class="sw trail"></i>ORV / ATV trails <small>50" or less</small></label>
+  <label class="row"><input type="checkbox" data-kind="mc" checked><i class="sw mc"></i>Motorcycle trails</label>
+  <label class="row"><input type="checkbox" data-kind="mccct" checked><i class="sw mccct"></i>Cross Country Cycle Trail</label>
+  <label class="row"><input type="checkbox" data-kind="scramble" checked><i class="sw scramble"></i>Scramble areas</label>
+  <label class="row"><input type="checkbox" data-kind="closed" checked><i class="sw closed"></i>Closures &amp; reroutes</label>
+  <h2>My machine</h2>
+  <div class="seg" id="rig-seg">
+    <button data-rig="0" class="on">Any</button>
+    <button data-rig="50">ATV ≤50"</button>
+    <button data-rig="64">SxS ≤64"</button>
+    <button data-rig="72">SxS ≤72"</button>
+    <button data-rig="99">Full-size</button>
+  </div>
+  <p class="hint">Trails too narrow for your machine fade out.</p>
+  <h2>Offline</h2>
+  <p class="hint" id="storage-info">Checking storage…</p>
+  <p class="hint" id="data-info"></p>
+  <button id="btn-clear" class="ghost">Delete saved map tiles</button>
+</section>
+
+<!-- save area -->
+<section id="panel-save" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <h2>Save this area for offline</h2>
+  <p class="hint">Saves the map background for what's on screen right now. Trails are always saved — this is just the topo/satellite imagery underneath.</p>
+  <label class="row">Detail
+    <select id="save-zoom">
+      <option value="14">Normal (to zoom 14)</option>
+      <option value="15" selected>High (to zoom 15)</option>
+      <option value="16">Max (to zoom 16)</option>
+    </select>
+  </label>
+  <label class="row"><input type="checkbox" id="save-sat"> Include satellite too</label>
+  <p id="save-est" class="est"></p>
+  <div id="save-progress" hidden><div class="bar"><span></span></div><p class="hint" id="save-status"></p></div>
+  <button id="btn-save-go" class="primary">Download</button>
+</section>
+
+<div id="toast" hidden></div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
