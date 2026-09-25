@@ -52,6 +52,27 @@ def clean(v):
     return v.strip() if isinstance(v, str) else v
 
 
+def legal_limit(p, kind):
+    """Widest machine (inches) the DNR designation allows, from the legal class fields.
+
+    None means no ORV class at all (snowmobile/hiking-only), which the map drops.
+    """
+    lims = []
+    route = p.get("ORVRoute") or ""
+    if "72" in route:
+        lims.append(72)
+    elif "65" in route:
+        lims.append(64)  # "65 Inch" routes are posted as less than 65 inches
+    if "50" in (p.get("ATVTrail") or ""):
+        lims.append(50)
+    if (p.get("Motorcycle") or "No") != "No":
+        lims.append(24)
+    if lims:
+        return max(lims)
+    # layers 12/13 always carry their class field; this is just a fallback
+    return {"trail": 50, "mc": 24, "mccct": 24}.get(kind)
+
+
 def slim(p, kind, name_field):
     name = clean(p.get(name_field)) or clean(p.get("TrailNamePrimary")) or ""
     out = {
@@ -65,6 +86,7 @@ def slim(p, kind, name_field):
         "mi": round(p["SegmentLengthMiles"], 2) if p.get("SegmentLengthMiles") else None,
         "co": clean(p.get("County")),
         "lic": clean(p.get("LicenseType")),
+        "lim": legal_limit(p, kind),
         "rd": {"No": "Trail", "1": None, "-2": None}.get(clean(p.get("TrailOnRoad")), clean(p.get("TrailOnRoad"))),
     }
     # comments that just repeat the name are noise
@@ -81,8 +103,10 @@ def main():
         for f in raw:
             if not f.get("geometry"):
                 continue
-            features.append({"type": "Feature", "geometry": f["geometry"],
-                             "properties": slim(f["properties"], kind, name_field)})
+            props = slim(f["properties"], kind, name_field)
+            if "lim" not in props:
+                continue  # hiking/snowmobile-only closure, not an ORV concern
+            features.append({"type": "Feature", "geometry": f["geometry"], "properties": props})
         print(f"layer {layer:>2} {kind:<8} {len(raw):>5} segments")
 
     areas = []

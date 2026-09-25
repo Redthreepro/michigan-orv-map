@@ -55,18 +55,10 @@ map.on('moveend', () => {
 
 // ---------- width fit ----------
 let rig = store.get('rig', 0);
+if (![0, 50, 64, 72].includes(rig)) rig = 0; // old "Full-size" option was removed
 
-function widthLimit(p) {
-  const r = (p.r || '').toLowerCase();
-  if (/less than 65 inch/.test(r)) return 64;
-  const w = (p.w || '').toLowerCase();
-  if (w.startsWith('24')) return 24;
-  if (w.startsWith('50')) return 50;
-  if (w.includes('less than 65')) return 64;
-  if (w.startsWith('72')) return 72;
-  return 999;
-}
-function fits(p) { return !rig || rig <= widthLimit(p); }
+// p.lim = widest machine (inches) the DNR trail class legally allows; set by build.py
+function fits(p) { return !rig || p.t === 'scramble' || (p.lim || 0) >= rig; }
 function isClosed(p) { return /closed/i.test(p.s || ''); }
 
 // ---------- trail layers ----------
@@ -85,16 +77,16 @@ function styleFor(f) {
   const w = lineWeight();
   if (p.t === 'closure') return { color: KIND.closure.color, weight: w + 1, dashArray: '8 6', opacity: 1 };
   if (p.t === 'reroute') return { color: KIND.reroute.color, weight: w + 1, dashArray: '8 6', opacity: 1 };
-  const ok = fits(p);
   return {
     color: isClosed(p) ? KIND.closure.color : KIND[p.t].color,
     weight: w,
-    opacity: ok ? 0.95 : 0.25,
+    opacity: 0.95,
     dashArray: p.t === 'mc' || p.t === 'mccct' ? '1 0' : null,
   };
 }
 
 const nameIndex = new Map();
+const allByKind = {};
 
 async function loadTrails() {
   const [res, meta] = await Promise.all([
@@ -102,14 +94,30 @@ async function loadTrails() {
     fetch('data/meta.json').then((r) => r.json()).catch(() => null),
   ]);
   const fc = await res.json();
-  const byKind = {};
-  for (const f of fc.features) (byKind[f.properties.t] ||= []).push(f);
+  for (const f of fc.features) (allByKind[f.properties.t] ||= []).push(f);
 
   for (const kind of ['scramble', 'route', 'trail', 'mc', 'mccct', 'closure', 'reroute']) {
-    layers[kind] = L.geoJSON({ type: 'FeatureCollection', features: byKind[kind] || [] }, {
-      renderer, style: styleFor, onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l); }),
+    layers[kind] = L.geoJSON(null, {
+      renderer, style: styleFor, filter: (f) => fits(f.properties),
+      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l); }),
     });
   }
+  fillLayers();
+  applyVisibility();
+  if (meta) $('#data-info').textContent = `Trail data: Michigan DNR, checked ${meta.built} · ${meta.closures} ORV closure segments.`;
+}
+
+// (re)load only what the selected machine may legally ride
+function fillLayers() {
+  for (const [kind, layer] of Object.entries(layers)) {
+    layer.clearLayers();
+    layer.addData({ type: 'FeatureCollection', features: allByKind[kind] || [] });
+  }
+  buildIndex();
+}
+
+function buildIndex() {
+  nameIndex.clear();
   // search index: unique names -> bounds
   const seen = new Set();
   for (const kind of ['route', 'trail', 'mc', 'scramble', 'mccct']) {
@@ -125,8 +133,6 @@ async function loadTrails() {
       if (cur) cur.b.extend(b); else nameIndex.set(key, { n, kind, b: L.latLngBounds(b.getSouthWest(), b.getNorthEast()), co: l.feature.properties.co });
     });
   }
-  applyVisibility();
-  if (meta) $('#data-info').textContent = `Trail data: Michigan DNR, pulled ${meta.built} · ${meta.closures} closure segments.`;
 }
 
 function applyVisibility() {
@@ -154,12 +160,11 @@ function showDetail(f, clicked) {
     layers[p.t].eachLayer((l) => { if (l.feature.properties.n === p.n) total += l.feature.properties.mi || 0; });
   } else total = p.mi || 0;
   const rows = [
-    ['Width', p.w], ['Surface', p.sf], ['Length', total ? total.toFixed(1) + ' mi' : null],
+    ['Allowed', p.lim === 24 ? 'Motorcycles only' : p.lim ? `Machines up to ${p.lim}" wide` : null], ['Trail width', p.w], ['Surface', p.sf], ['Length', total ? total.toFixed(1) + ' mi' : null],
     ['County', p.co], ['Runs on', p.rd],
   ].filter(([, v]) => v);
   let html = `<h3>${esc(p.n || KIND[p.t].label)}</h3>
     <span class="tag kind">${esc(KIND[p.t].label)}</span>${status ? `<span class="tag ${cls}">${esc(status)}</span>` : ''}`;
-  if (rig && p.t !== 'scramble' && !fits(p)) html += `<span class="tag closed">Too narrow for your machine</span>`;
   if (rows.length) html += '<dl>' + rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>';
   if (p.r) html += `<div class="note restrict">${esc(p.r)}</div>`;
   if (p.c) html += `<div class="note">${esc(p.c)}</div>`;
@@ -201,9 +206,14 @@ document.querySelectorAll('[data-kind]').forEach((cb) => {
   cb.addEventListener('change', () => { shown[cb.dataset.kind] = cb.checked ? 1 : 0; store.set('shown', shown); applyVisibility(); });
 });
 function setRig(v) {
+  const changed = v !== rig;
   rig = v; store.set('rig', v);
   document.querySelectorAll('#rig-seg button').forEach((b) => b.classList.toggle('on', +b.dataset.rig === v));
-  restyle();
+  if (changed && layers.route) {
+    if (highlight) { map.removeLayer(highlight); highlight = null; }
+    fillLayers();
+    applyVisibility();
+  }
 }
 document.querySelectorAll('#rig-seg button').forEach((b) => b.addEventListener('click', () => setRig(+b.dataset.rig)));
 setRig(rig);

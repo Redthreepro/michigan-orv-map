@@ -56,7 +56,7 @@
     <button data-base="sat">Satellite</button>
   </div>
   <h2>Show</h2>
-  <label class="row"><input type="checkbox" data-kind="route" checked><i class="sw route"></i>ORV routes <small>wider, most machines</small></label>
+  <label class="row"><input type="checkbox" data-kind="route" checked><i class="sw route"></i>ORV routes <small>up to 64" or 72"</small></label>
   <label class="row"><input type="checkbox" data-kind="trail" checked><i class="sw trail"></i>ORV / ATV trails <small>50" or less</small></label>
   <label class="row"><input type="checkbox" data-kind="mc" checked><i class="sw mc"></i>Motorcycle trails</label>
   <label class="row"><input type="checkbox" data-kind="mccct" checked><i class="sw mccct"></i>Cross Country Cycle Trail</label>
@@ -64,13 +64,12 @@
   <label class="row"><input type="checkbox" data-kind="closed" checked><i class="sw closed"></i>Closures &amp; reroutes</label>
   <h2>My machine</h2>
   <div class="seg" id="rig-seg">
-    <button data-rig="0" class="on">Any</button>
-    <button data-rig="50">ATV ≤50"</button>
-    <button data-rig="64">SxS ≤64"</button>
-    <button data-rig="72">SxS ≤72"</button>
-    <button data-rig="99">Full-size</button>
+    <button data-rig="0" class="on">Show all</button>
+    <button data-rig="50">50" or less</button>
+    <button data-rig="64">51–64"</button>
+    <button data-rig="72">65–72"</button>
   </div>
-  <p class="hint">Trails too narrow for your machine fade out.</p>
+  <p class="hint">Pick your machine's width. Anything it isn't legally allowed on (by DNR trail class) is removed from the map and search.</p>
   <h2>Offline</h2>
   <p class="hint" id="storage-info">Checking storage…</p>
   <p class="hint" id="data-info"></p>
