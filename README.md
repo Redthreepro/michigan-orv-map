@@ -11,6 +11,9 @@ roads open to ORVs (shown from zoom 10 in).
 - **Ride recording**: record button tracks your ride (distance, time, avg mph), survives the app being
   closed mid-ride, saves rides on the phone, exports GPX via the share sheet. Keep the app on screen
   while recording — phones pause GPS for web apps in the background.
+- **Tap-to-route**: long-press the map (or "Route here" on any trail) for the best legal path for your
+  machine over routes, trails, and forest roads — computed on the phone, works offline. Where the DNR
+  network doesn't connect, it routes as close as it can and shows the gap.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

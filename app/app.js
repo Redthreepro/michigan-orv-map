@@ -105,7 +105,7 @@ async function loadTrails() {
     if (kind === 'road') { layers.road = L.featureGroup(); continue; }
     layers[kind] = L.geoJSON(null, {
       renderer, style: styleFor, filter: (f) => fits(f.properties),
-      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l); }),
+      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l, e.latlng); }),
     });
   }
   fillLayers();
@@ -177,7 +177,7 @@ function buildRoadCells(features) {
   for (const feats of buckets.values()) {
     const layer = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
       renderer, style: styleFor,
-      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l); }),
+      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l, e.latlng); }),
     });
     roadCells.push({ layer, bounds: layer.getBounds() });
   }
@@ -199,7 +199,7 @@ function restyle() {
 map.on('zoomend', restyle);
 
 // ---------- detail sheet ----------
-function showDetail(f, clicked) {
+function showDetail(f, clicked, latlng) {
   const p = f.properties;
   const status = p.s || (p.t === 'closure' ? 'Temporarily Closed' : p.t === 'reroute' ? 'Temporary reroute'
     : p.t === 'road' ? (p.sea || p.mil ? 'Seasonally closed to ORVs' : 'Open to ORVs') : null);
@@ -219,7 +219,10 @@ function showDetail(f, clicked) {
   if (p.t === 'road' && p.od) html += `<div class="note restrict">DNR ORV dates for this road: opening ${esc(p.od)}, closing ${esc(p.cd || '?')}.</div>`;
   if (p.mil) html += `<div class="note restrict">Camp Grayling military road. May close without notice for training. Check Camp Grayling's Facebook page before riding.</div>`;
   if (p.c) html += `<div class="note">${esc(p.c)}</div>`;
+  html += `<button class="primary" id="btn-detail-route">Route here</button>`;
   $('#sheet-body').innerHTML = html;
+  const target = latlng || (clicked.getCenter ? clicked.getCenter() : clicked.getBounds().getCenter());
+  $('#btn-detail-route').addEventListener('click', () => window.routeHere && window.routeHere(target));
   openSheet('#sheet');
   highlightName(p, clicked);
 }

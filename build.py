@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from graph import build_graph
+
 DNR = "https://gisagodnr.state.mi.us/arcgis/rest/services/DNR/DNRTrailsOPENDATA/FeatureServer"
 ROADS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_ROADS/FeatureServer/0"
 ROADS_WHERE = ("RoadORVUse IN ('DNR Roads Open to ORVs','DNR Roads Seasonally Closed to ORVs',"
@@ -119,20 +121,26 @@ def build_roads():
         g = shape(f["geometry"])
         groups[key] += list(g.geoms) if g.geom_type == "MultiLineString" else [g]
 
-    feats = []
+    # boat launches, access sites, parking lots: DNR tags their driveways "open", but they aren't riding
+    junk = re.compile(r"\b(BAS|Access|Boat|Launch|Parking)\b", re.I)
+    feats, dropped = [], 0
     for (name, seasonal, military, od, cd), lines in groups.items():
         props = {"t": "road", "n": name, "sea": 1 if seasonal else None, "mil": 1 if military else None,
                  "od": od, "cd": cd}
         props = {k: v for k, v in props.items() if v is not None}
         merged = linemerge(lines)
         for part in (merged.geoms if merged.geom_type == "MultiLineString" else [merged]):
+            if name and junk.search(name) and part.length < 0.015:  # ~1 mile
+                dropped += 1
+                continue
             coords = [[round(x, 5), round(y, 5)] for x, y in part.coords]
             feats.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": coords},
                           "properties": props})
     (OUT / "roads.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": feats},
                                                   separators=(",", ":")), encoding="utf-8")
-    print(f"forest roads  {len(raw):>6} segments -> {len(feats)} lines, "
+    print(f"forest roads  {len(raw):>6} segments -> {len(feats)} lines ({dropped} access-site stubs dropped), "
           f"{(OUT / 'roads.geojson').stat().st_size / 1e6:.1f} MB")
+    return feats
 
 
 def main():
@@ -157,7 +165,11 @@ def main():
                       "properties": {"t": "scramble", "n": name}})
     print(f"scramble areas     {len(areas):>5}")
 
-    build_roads()
+    road_feats = build_roads()
+
+    n_edges, n_conn = build_graph(features, road_feats, OUT / "graph.json")
+    print(f"routing graph {n_edges} edges ({n_conn} gap connectors), "
+          f"{(OUT / 'graph.json').stat().st_size / 1e6:.1f} MB")
 
     fc = {"type": "FeatureCollection", "features": areas + features}
     (OUT / "trails.geojson").write_text(json.dumps(fc, separators=(",", ":")), encoding="utf-8")

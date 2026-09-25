@@ -22,7 +22,10 @@
   <ul id="results" hidden></ul>
 </div>
 
-<button id="rec-bar" hidden><i></i><span></span></button>
+<div id="chips">
+  <button id="rec-bar" class="chip" hidden><i></i><span></span></button>
+  <button id="route-bar" class="chip" hidden><b>&#10148;</b><span></span><em class="x" aria-label="Clear route">&times;</em></button>
+</div>
 
 <div id="fabs">
   <button id="btn-rec" class="fab" aria-label="Record ride">
@@ -95,6 +98,22 @@
   <button id="btn-save-go" class="primary">Download</button>
 </section>
 
+<!-- long-press point -->
+<section id="panel-point" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <h2>This spot</h2>
+  <p class="hint" id="point-coords"></p>
+  <button id="btn-route-here" class="primary">Route here</button>
+  <button id="btn-route-from" class="ghost">Route from here</button>
+</section>
+
+<!-- route -->
+<section id="panel-route" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <div id="route-body"></div>
+  <button id="btn-route-clear" class="ghost">Clear route</button>
+</section>
+
 <!-- rides -->
 <section id="panel-rides" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
@@ -111,5 +130,6 @@
 <script src="vendor/leaflet.js"></script>
 <script src="app.js"></script>
 <script src="tracks.js"></script>
+<script src="routing.js"></script>
 </body>
 </html>
