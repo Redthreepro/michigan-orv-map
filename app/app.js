@@ -16,6 +16,7 @@ const KIND = {
   closure:  { label: 'Temporary closure', color: '#ff2d2d' },
   reroute:  { label: 'Temporary reroute', color: '#ffd400' },
   scramble: { label: 'Scramble area',    color: '#f28c28' },
+  road:     { label: 'State forest road', color: '#12a89d' },
 };
 
 const $ = (s) => document.querySelector(s);
@@ -64,6 +65,8 @@ function isClosed(p) { return /closed/i.test(p.s || ''); }
 // ---------- trail layers ----------
 const layers = {};
 const shown = store.get('shown', { route: 1, trail: 1, mc: 1, mccct: 1, scramble: 1, closed: 1 });
+if (shown.road === undefined) shown.road = 1;
+const ROAD_MIN_ZOOM = 10; // 38k forest roads: only draw once zoomed in
 let highlight = null;
 
 function lineWeight() {
@@ -76,6 +79,7 @@ function styleFor(f) {
   if (p.t === 'scramble') return { color: KIND.scramble.color, weight: 2, fillOpacity: 0.25 };
   const w = lineWeight();
   if (p.t === 'closure') return { color: KIND.closure.color, weight: w + 1, dashArray: '8 6', opacity: 1 };
+  if (p.t === 'road') return { color: KIND.road.color, weight: Math.max(2, w - 1), opacity: 0.9, dashArray: p.sea || p.mil ? '6 5' : null };
   if (p.t === 'reroute') return { color: KIND.reroute.color, weight: w + 1, dashArray: '8 6', opacity: 1 };
   return {
     color: isClosed(p) ? KIND.closure.color : KIND[p.t].color,
@@ -85,6 +89,7 @@ function styleFor(f) {
   };
 }
 
+const DRAW_ORDER = ['scramble', 'road', 'route', 'trail', 'mc', 'mccct', 'closure', 'reroute'];
 const nameIndex = new Map();
 const allByKind = {};
 
@@ -96,7 +101,8 @@ async function loadTrails() {
   const fc = await res.json();
   for (const f of fc.features) (allByKind[f.properties.t] ||= []).push(f);
 
-  for (const kind of ['scramble', 'route', 'trail', 'mc', 'mccct', 'closure', 'reroute']) {
+  for (const kind of DRAW_ORDER) {
+    if (kind === 'road') { layers.road = L.featureGroup(); continue; }
     layers[kind] = L.geoJSON(null, {
       renderer, style: styleFor, filter: (f) => fits(f.properties),
       onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l); }),
@@ -104,12 +110,18 @@ async function loadTrails() {
   }
   fillLayers();
   applyVisibility();
+  // forest roads are big; load them after the trails are already on screen
+  fetch('data/roads.geojson').then((r) => r.json()).then((roads) => {
+    buildRoadCells(roads.features);
+    applyVisibility();
+  }).catch(() => toast('Could not load forest roads'));
   if (meta) $('#data-info').textContent = `Trail data: Michigan DNR, checked ${meta.built} · ${meta.closures} ORV closure segments.`;
 }
 
 // (re)load only what the selected machine may legally ride
 function fillLayers() {
   for (const [kind, layer] of Object.entries(layers)) {
+    if (kind === 'road') continue; // forest roads are open to every ORV size
     layer.clearLayers();
     layer.addData({ type: 'FeatureCollection', features: allByKind[kind] || [] });
   }
@@ -136,14 +148,50 @@ function buildIndex() {
 }
 
 function applyVisibility() {
-  for (const [kind, layer] of Object.entries(layers)) {
+  let added = false;
+  for (const kind of DRAW_ORDER) {
+    const layer = layers[kind];
+    if (!layer) continue;
     const key = kind === 'closure' || kind === 'reroute' ? 'closed' : kind;
-    if (shown[key]) layer.addTo(map); else map.removeLayer(layer);
+    const on = shown[key] && (kind !== 'road' || map.getZoom() >= ROAD_MIN_ZOOM);
+    if (on && !map.hasLayer(layer)) { layer.addTo(map); added = true; } else if (!on) map.removeLayer(layer);
   }
-  // keep closures on top
-  for (const k of ['closure', 'reroute']) if (shown.closed && layers[k]) layers[k].bringToFront();
-  if (highlight) highlight.bringToFront();
+  // canvas draws in add order; re-stack so roads stay under trails and closures on top
+  updateRoads();
+  if (added) for (const kind of DRAW_ORDER) if (kind !== 'road' && map.hasLayer(layers[kind])) layers[kind].bringToFront();
+  if (highlight) highlight.bringToBack();
 }
+map.on('zoomend', applyVisibility);
+
+// Forest roads are bucketed into ~17-mile squares; only squares near the view are on the map,
+// so zooming/panning projects a few thousand lines instead of 38k.
+const ROAD_CELL = 0.25;
+const roadCells = [];
+function buildRoadCells(features) {
+  const buckets = new Map();
+  for (const f of features) {
+    const [lng, lat] = f.geometry.coordinates[0];
+    const key = Math.floor(lng / ROAD_CELL) + ',' + Math.floor(lat / ROAD_CELL);
+    (buckets.get(key) || buckets.set(key, []).get(key)).push(f);
+  }
+  for (const feats of buckets.values()) {
+    const layer = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
+      renderer, style: styleFor,
+      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l); }),
+    });
+    roadCells.push({ layer, bounds: layer.getBounds() });
+  }
+}
+function updateRoads() {
+  if (!map.hasLayer(layers.road)) return;
+  const view = map.getBounds().pad(0.25);
+  for (const c of roadCells) {
+    const want = view.intersects(c.bounds);
+    const has = layers.road.hasLayer(c.layer);
+    if (want && !has) { c.layer.setStyle(styleFor); layers.road.addLayer(c.layer); } else if (!want && has) layers.road.removeLayer(c.layer);
+  }
+}
+map.on('moveend', updateRoads);
 
 function restyle() {
   for (const layer of Object.values(layers)) layer.setStyle(styleFor);
@@ -153,10 +201,11 @@ map.on('zoomend', restyle);
 // ---------- detail sheet ----------
 function showDetail(f, clicked) {
   const p = f.properties;
-  const status = p.s || (p.t === 'closure' ? 'Temporarily Closed' : p.t === 'reroute' ? 'Temporary reroute' : null);
+  const status = p.s || (p.t === 'closure' ? 'Temporarily Closed' : p.t === 'reroute' ? 'Temporary reroute'
+    : p.t === 'road' ? (p.sea || p.mil ? 'Seasonally closed to ORVs' : 'Open to ORVs') : null);
   const cls = /closed/i.test(status || '') ? 'closed' : /reroute/i.test(status || '') ? 'reroute' : 'open';
   let total = 0;
-  if (p.n && layers[p.t] && p.t !== 'closure' && p.t !== 'reroute') {
+  if (p.n && layers[p.t] && !['closure', 'reroute', 'road'].includes(p.t)) {
     layers[p.t].eachLayer((l) => { if (l.feature.properties.n === p.n) total += l.feature.properties.mi || 0; });
   } else total = p.mi || 0;
   const rows = [
@@ -167,6 +216,8 @@ function showDetail(f, clicked) {
     <span class="tag kind">${esc(KIND[p.t].label)}</span>${status ? `<span class="tag ${cls}">${esc(status)}</span>` : ''}`;
   if (rows.length) html += '<dl>' + rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>';
   if (p.r) html += `<div class="note restrict">${esc(p.r)}</div>`;
+  if (p.t === 'road' && p.od) html += `<div class="note restrict">DNR ORV dates for this road: opening ${esc(p.od)}, closing ${esc(p.cd || '?')}.</div>`;
+  if (p.mil) html += `<div class="note restrict">Camp Grayling military road. May close without notice for training. Check Camp Grayling's Facebook page before riding.</div>`;
   if (p.c) html += `<div class="note">${esc(p.c)}</div>`;
   $('#sheet-body').innerHTML = html;
   openSheet('#sheet');
@@ -176,7 +227,7 @@ function showDetail(f, clicked) {
 function highlightName(p, clicked) {
   if (highlight) map.removeLayer(highlight);
   const feats = [];
-  if (p.n && layers[p.t] && p.t !== 'closure' && p.t !== 'reroute') {
+  if (p.n && layers[p.t] && !['closure', 'reroute', 'road'].includes(p.t)) {
     layers[p.t].eachLayer((l) => { if (l.feature.properties.n === p.n) feats.push(l.feature); });
   } else feats.push(clicked.feature);
   highlight = L.geoJSON({ type: 'FeatureCollection', features: feats }, {

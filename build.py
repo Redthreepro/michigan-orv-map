@@ -12,6 +12,9 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 DNR = "https://gisagodnr.state.mi.us/arcgis/rest/services/DNR/DNRTrailsOPENDATA/FeatureServer"
+ROADS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_ROADS/FeatureServer/0"
+ROADS_WHERE = ("RoadORVUse IN ('DNR Roads Open to ORVs','DNR Roads Seasonally Closed to ORVs',"
+               "'Military Roads Open to ORVs','Military Roads Seasonally Closed to ORVs')")
 SCRAMBLE = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_ORV_Scramble_Areas/FeatureServer/1"
 
 # layer id -> (type key, name field)
@@ -27,20 +30,20 @@ LAYERS = {
 OUT = Path(__file__).parent / "app" / "data"
 
 
-def fetch(url, extra=None):
+def fetch(url, extra=None, page=1000):
     feats, offset = [], 0
     while True:
         q = {
             "where": "1=1", "outFields": "*", "outSR": "4326", "f": "geojson",
             "geometryPrecision": "5", "maxAllowableOffset": "0.00003",
-            "resultOffset": str(offset), "resultRecordCount": "1000",
+            "resultOffset": str(offset), "resultRecordCount": str(page),
         }
         q.update(extra or {})
         with urllib.request.urlopen(f"{url}/query?{urllib.parse.urlencode(q)}", timeout=120) as r:
-            page = json.load(r)
-        got = page.get("features", [])
+            resp = json.load(r)
+        got = resp.get("features", [])
         feats += got
-        if len(got) < 1000:
+        if len(got) < page:
             return feats
         offset += len(got)
         time.sleep(0.3)
@@ -95,6 +98,43 @@ def slim(p, kind, name_field):
     return {k: v for k, v in out.items() if v is not None}
 
 
+def build_roads():
+    """State forest roads open to ORVs, merged into longer lines to keep the phone map fast."""
+    from collections import defaultdict
+    from shapely.geometry import shape
+    from shapely.ops import linemerge
+
+    raw = fetch(ROADS, {"where": ROADS_WHERE, "maxAllowableOffset": "0.00005",
+                        "outFields": "RoadPrimary,RoadORVUse,ORVOpeningDate,ORVClosingDate"})
+    groups = defaultdict(list)
+    for f in raw:
+        if not f.get("geometry"):
+            continue
+        p = f["properties"]
+        use = p["RoadORVUse"]
+        seasonal, military = "Seasonally" in use, "Military" in use
+        key = (clean(p.get("RoadPrimary")), seasonal, military,
+               clean(p.get("ORVOpeningDate")) if seasonal and not military else None,
+               clean(p.get("ORVClosingDate")) if seasonal and not military else None)
+        g = shape(f["geometry"])
+        groups[key] += list(g.geoms) if g.geom_type == "MultiLineString" else [g]
+
+    feats = []
+    for (name, seasonal, military, od, cd), lines in groups.items():
+        props = {"t": "road", "n": name, "sea": 1 if seasonal else None, "mil": 1 if military else None,
+                 "od": od, "cd": cd}
+        props = {k: v for k, v in props.items() if v is not None}
+        merged = linemerge(lines)
+        for part in (merged.geoms if merged.geom_type == "MultiLineString" else [merged]):
+            coords = [[round(x, 5), round(y, 5)] for x, y in part.coords]
+            feats.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": coords},
+                          "properties": props})
+    (OUT / "roads.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": feats},
+                                                  separators=(",", ":")), encoding="utf-8")
+    print(f"forest roads  {len(raw):>6} segments -> {len(feats)} lines, "
+          f"{(OUT / 'roads.geojson').stat().st_size / 1e6:.1f} MB")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     features = []
@@ -116,6 +156,8 @@ def main():
         areas.append({"type": "Feature", "geometry": f["geometry"],
                       "properties": {"t": "scramble", "n": name}})
     print(f"scramble areas     {len(areas):>5}")
+
+    build_roads()
 
     fc = {"type": "FeatureCollection", "features": areas + features}
     (OUT / "trails.geojson").write_text(json.dumps(fc, separators=(",", ":")), encoding="utf-8")

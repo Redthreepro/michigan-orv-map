@@ -23,11 +23,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Pull latest DNR trail data
         if: github.event_name != 'push'
-        run: python3 build.py
+        run: |
+          pip install shapely
+          python3 build.py
       - name: Commit data if trails changed
         if: github.event_name != 'push'
         run: |
-          if git diff --quiet -- app/data/trails.geojson; then
+          if git diff --quiet -- app/data/trails.geojson app/data/roads.geojson; then
             # still deploys the fresh meta.json so the app shows when it was last checked
             echo "No trail changes"
           else

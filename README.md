@@ -1,7 +1,8 @@
 # Michigan ORV Map
 
 Offline-capable phone map (PWA) of every Michigan DNR ORV route, ORV/ATV trail, motorcycle trail,
-MCCCT segment, scramble area, and current temporary closure/reroute.
+MCCCT segment, scramble area, current temporary closure/reroute, and the ~11,800 miles of state forest
+roads open to ORVs (shown from zoom 10 in).
 
 - **Trails** ship with the app (~3 MB) and work with no signal once installed.
 - **Map background** (USGS topo / satellite, public domain) caches automatically wherever you browse,
@@ -15,6 +16,7 @@ MCCCT segment, scramble area, and current temporary closure/reroute.
 ## Refresh trail data (closures change often)
 
 ```
+pip install shapely
 python build.py
 ```
 
