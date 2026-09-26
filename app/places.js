@@ -13,6 +13,8 @@ for (const k of ['gas', 'camp', 'land', 'wp', 'th']) if (shown[k] === undefined)
 
 // camping land sits under everything else
 map.createPane('land').style.zIndex = 350;
+// fade the whole pane, not each shape, so slightly overlapping parcels don't draw darker seams
+map.getPane('land').style.opacity = 0.22;
 const landRenderer = L.canvas({ pane: 'land' });
 
 const GLYPH = {
@@ -38,7 +40,7 @@ fetch('data/camping_land.geojson').then((r) => r.json()).then((fc) => {
   });
   landLayer = L.geoJSON(fc, {
     renderer: landRenderer, interactive: false,
-    style: { stroke: false, fillColor: '#4caf50', fillOpacity: 0.2 },
+    style: { stroke: false, fillColor: '#4caf50', fillOpacity: 1 },
   });
   applyPlaces();
 }).catch(() => {});
@@ -143,7 +145,7 @@ window.sendDirections = sendDirections;
 const DIR_BTNS = `<div class="rec-row"><button class="ghost" data-a="drive">Drive here (Google Maps)</button><button class="ghost" data-a="send">Send directions</button></div>`;
 
 // ---------- trailheads / ORV parking ----------
-const limLabel = (lim) => (lim === 24 ? 'motorcycles only' : lim ? `up to ${lim}"` : '');
+const limLabel = (lim) => (lim === 24 ? 'motorcycles only' : lim >= 999 ? 'any size ORV' : lim ? `up to ${lim}"` : '');
 function showTrailhead(p) {
   let html = `<h3>${esc(p.n)}</h3><span class="tag kind">${esc(p.sub === 'Trailhead' ? 'ORV trailhead' : 'ORV parking')}</span>`;
   const rows = [['Where', p.note], ['Surface', p.sf]].filter(([, v]) => v);

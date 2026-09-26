@@ -17,6 +17,7 @@ const KIND = {
   reroute:  { label: 'Temporary reroute', color: '#ffd400' },
   scramble: { label: 'Scramble area',    color: '#f28c28' },
   road:     { label: 'State forest road', color: '#12a89d' },
+  nf:       { label: 'National forest road', color: '#8a5a2b' },
 };
 
 const $ = (s) => document.querySelector(s);
@@ -71,7 +72,17 @@ function isClosed(p) { return /closed/i.test(p.s || ''); }
 const layers = {};
 const shown = store.get('shown', { route: 1, trail: 1, mc: 1, mccct: 1, scramble: 1, closed: 1 });
 if (shown.road === undefined) shown.road = 1;
-const ROAD_MIN_ZOOM = 10; // 38k forest roads: only draw once zoomed in
+const ROAD_MIN_ZOOM = 10; // ~46k state + national forest roads: only draw once zoomed in
+
+// USFS open dates like "05/16-03/14" (may wrap past New Year). Open today?
+function openToday(dates, when = new Date()) {
+  const m = /^(\d\d)\/(\d\d)-(\d\d)\/(\d\d)$/.exec(dates || '');
+  if (!m) return true;
+  const md = (when.getMonth() + 1) * 100 + when.getDate();
+  const a = +m[1] * 100 + +m[2], b = +m[3] * 100 + +m[4];
+  return a <= b ? md >= a && md <= b : md >= a || md <= b;
+}
+const fmtDates = (d) => d.replace(/(\d\d)\/(\d\d)/g, (_, mo, da) => new Date(2000, +mo - 1, +da).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })).replace('-', ' – ');
 let highlight = null;
 
 function lineWeight() {
@@ -85,6 +96,8 @@ function styleFor(f) {
   const w = lineWeight();
   if (p.t === 'closure') return { color: KIND.closure.color, weight: w + 1, dashArray: '8 6', opacity: 1 };
   if (p.t === 'road') return { color: KIND.road.color, weight: Math.max(2, w - 1), opacity: 0.9, dashArray: p.sea || p.mil ? '6 5' : null };
+  if (p.t === 'nf') return { color: KIND.nf.color, weight: Math.max(2, w - 1), opacity: openToday(p.dates) ? 0.9 : 0.35,
+    dashArray: p.sub === 'trail' ? '2 5' : p.sea ? '6 5' : null };
   if (p.t === 'reroute') return { color: KIND.reroute.color, weight: w + 1, dashArray: '8 6', opacity: 1 };
   return {
     color: isClosed(p) ? KIND.closure.color : KIND[p.t].color,
@@ -175,9 +188,14 @@ map.on('zoomend', applyVisibility);
 // so zooming/panning projects a few thousand lines instead of 38k.
 const ROAD_CELL = 0.25;
 const roadCells = [];
+let roadFeatures = [];
 function buildRoadCells(features) {
+  roadFeatures = features;
+  for (const c of roadCells) layers.road.removeLayer(c.layer);
+  roadCells.length = 0;
   const buckets = new Map();
   for (const f of features) {
+    if (!fits(f.properties)) continue;
     const [lng, lat] = f.geometry.coordinates[0];
     const key = Math.floor(lng / ROAD_CELL) + ',' + Math.floor(lat / ROAD_CELL);
     (buckets.get(key) || buckets.set(key, []).get(key)).push(f);
@@ -210,21 +228,25 @@ map.on('zoomend', restyle);
 function showDetail(f, clicked, latlng) {
   const p = f.properties;
   const status = p.s || (p.t === 'closure' ? 'Temporarily Closed' : p.t === 'reroute' ? 'Temporary reroute'
-    : p.t === 'road' ? (p.sea || p.mil ? 'Seasonally closed to ORVs' : 'Open to ORVs') : null);
+    : p.t === 'road' ? (p.sea || p.mil ? 'Seasonally closed to ORVs' : 'Open to ORVs')
+    : p.t === 'nf' ? (openToday(p.dates) ? 'Open to ORVs today' : 'Closed to ORVs today') : null);
   const cls = /closed/i.test(status || '') ? 'closed' : /reroute/i.test(status || '') ? 'reroute' : 'open';
   let total = 0;
   if (p.n && layers[p.t] && !['closure', 'reroute', 'road'].includes(p.t)) {
     layers[p.t].eachLayer((l) => { if (l.feature.properties.n === p.n) total += l.feature.properties.mi || 0; });
   } else total = p.mi || 0;
   const rows = [
-    ['Allowed', p.lim === 24 ? 'Motorcycles only' : p.lim ? `Machines up to ${p.lim}" wide` : null], ['Trail width', p.w], ['Surface', p.sf], ['Length', total ? total.toFixed(1) + ' mi' : null],
+    ['Allowed', p.lim === 24 ? 'Motorcycles only' : p.lim >= 999 ? 'Any size ORV' : p.lim ? `Machines up to ${p.lim}" wide` : null], ['Trail width', p.w], ['Surface', p.sf], ['Length', total ? total.toFixed(1) + ' mi' : null],
     ['County', p.co], ['Runs on', p.rd],
+    ['Open', p.t === 'nf' ? (p.dates ? fmtDates(p.dates) : 'All year') : null], ['Forest', p.forest ? p.forest + ' National Forest' : null],
   ].filter(([, v]) => v);
-  let html = `<h3>${esc(p.n || KIND[p.t].label)}</h3>
-    <span class="tag kind">${esc(KIND[p.t].label)}</span>${status ? `<span class="tag ${cls}">${esc(status)}</span>` : ''}${p.hc === 2 ? '<span class="tag reroute">4x4 + high clearance</span>' : p.hc === 1 ? '<span class="tag reroute">High clearance</span>' : ''}`;
+  const kindLabel = p.t === 'nf' && p.sub === 'trail' ? 'National forest trail' : KIND[p.t].label;
+  let html = `<h3>${esc(p.n || kindLabel)}</h3>
+    <span class="tag kind">${esc(kindLabel)}</span>${status ? `<span class="tag ${cls}">${esc(status)}</span>` : ''}${p.hc === 2 ? '<span class="tag reroute">4x4 + high clearance</span>' : p.hc === 1 ? '<span class="tag reroute">High clearance</span>' : ''}`;
   if (rows.length) html += '<dl>' + rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>';
   if (p.r) html += `<div class="note restrict">${esc(p.r)}</div>`;
   if (p.t === 'road' && p.od) html += `<div class="note restrict">DNR ORV dates for this road: opening ${esc(p.od)}, closing ${esc(p.cd || '?')}.</div>`;
+  if (p.t === 'nf') html += `<div class="note">From the U.S. Forest Service Motor Vehicle Use Map. National forest rules apply. Follow posted signs.</div>`;
   if (p.mil) html += `<div class="note restrict">Camp Grayling military road. May close without notice for training. Check Camp Grayling's Facebook page before riding.</div>`;
   if (p.c) html += `<div class="note">${esc(p.c)}</div>`;
   html += `<div class="rec-row"><button class="primary" id="btn-detail-route">Route here</button><button class="ghost" id="btn-detail-trip">Add to trip</button></div>`;
@@ -277,6 +299,7 @@ function setRig(v) {
   if (changed && layers.route) {
     if (highlight) { map.removeLayer(highlight); highlight = null; }
     fillLayers();
+    if (roadFeatures.length) buildRoadCells(roadFeatures);
     applyVisibility();
   }
 }

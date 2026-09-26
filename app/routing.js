@@ -3,7 +3,7 @@
 
 // m/s (~15/12/10/14/5 mph). Routes often run on top of forest roads; the slightly slower road
 // speed makes the named route win so directions read "North Missaukee Route" instead of flip-flopping.
-const SPEED = { route: 6.7, trail: 5.4, mc: 4.5, mccct: 4.5, road: 6.26, connector: 2.2 };
+const SPEED = { route: 6.7, trail: 5.4, mc: 4.5, mccct: 4.5, road: 6.26, nf: 6.26, connector: 2.2 };
 const MAX_SPEED = 6.7;
 const MIN_STEP_M = 650; // fold blips shorter than this into the surrounding step
 const CELL = 0.02;                 // edge grid for snapping, ~1.5 km
@@ -68,9 +68,10 @@ function loadGraph() {
 
 // ---------- rules ----------
 function allowed(e) {
-  const [, lim, , flags] = G.attrs[G.eattr[e]];
+  const [, lim, , flags, dates] = G.attrs[G.eattr[e]];
   if (flags & FLAG.closed) return false;
   if (rig && lim < rig) return false;
+  if (dates && !openToday(dates)) return false; // national forest roads outside their open dates
   return true;
 }
 function cost(e, meters) {
@@ -120,7 +121,8 @@ function candidates(lat, lng, extraM) {
 // Connected pieces of the network for the current machine width (cached per width).
 const compCache = new Map();
 function components() {
-  if (compCache.has(rig)) return compCache.get(rig);
+  const ck = rig + '|' + new Date().toDateString();
+  if (compCache.has(ck)) return compCache.get(ck);
   const N = G.nx.length, comp = new Int32Array(N).fill(-1);
   for (let s = 0; s < N; s++) {
     if (comp[s] >= 0) continue;
@@ -135,7 +137,7 @@ function components() {
       }
     }
   }
-  compCache.set(rig, comp);
+  compCache.set(ck, comp);
   return comp;
 }
 

@@ -18,6 +18,8 @@ ROADS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_
 ROADS_WHERE = ("RoadORVUse IN ('DNR Roads Open to ORVs','DNR Roads Seasonally Closed to ORVs',"
                "'Military Roads Open to ORVs','Military Roads Seasonally Closed to ORVs')")
 PARKS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/ArcGIS/rest/services/dnrParksAndRecreation/FeatureServer"
+MVUM = "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_MVUM_02/MapServer"
+MI_FORESTS = ("Huron-Manistee National Forest", "Hiawatha National Forest", "Ottawa National Forest")
 ASSETS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNRReferenceAssetsOPENDATA/FeatureServer"
 ORV_WHERE = "DESCRIP LIKE '%ORV%' OR COMMENTS LIKE '%ORV%'"
 OVERPASS = "https://overpass-api.de/api/interpreter"
@@ -150,6 +152,61 @@ def build_roads():
                                                   separators=(",", ":")), encoding="utf-8")
     print(f"forest roads  {len(raw):>6} segments -> {len(feats)} lines ({dropped} access-site stubs dropped), "
           f"{(OUT / 'roads.geojson').stat().st_size / 1e6:.1f} MB")
+    return feats
+
+
+def build_nf():
+    """National forest roads and trails open to ORVs (USFS Motor Vehicle Use Map), Michigan forests only."""
+    from collections import defaultdict
+    import shapely
+    from shapely.geometry import shape
+    from shapely.ops import linemerge
+
+    forests = ",".join(f"'{f}'" for f in MI_FORESTS)
+    where = (f"forestname IN ({forests}) AND (atv='open' OR other_ohv_gt50inches='open' "
+             "OR other_ohv_lt50inches='open' OR motorcycle='open')")
+    fields = ("id,name,forestname,atv,atv_datesopen,other_ohv_gt50inches,"
+              "other_ohv_gt50_datesopen,other_ohv_lt50inches,other_ohv_lt50_datesopen,motorcycle,motorcycle_datesopen")
+    groups = defaultdict(list)
+    total = 0
+    for layer, sub in ((1, "road"), (2, "trail")):
+        extra = ",surfacetype,operationalmaintlevel" if sub == "road" else ",trailclass"  # trails lack road fields
+        raw = fetch(f"{MVUM}/{layer}", {"where": where, "outFields": fields + extra, "maxAllowableOffset": "0.00005"})
+        total += len(raw)
+        for f in raw:
+            if not f.get("geometry"):
+                continue
+            p = f["properties"]
+            is_open = lambda k: (p.get(k) or "").lower() == "open"
+            # widest ORV class the Forest Service allows here, and the dates for it
+            if is_open("other_ohv_gt50inches"):
+                lim, dates = 999, p.get("other_ohv_gt50_datesopen")
+            elif is_open("atv") or is_open("other_ohv_lt50inches"):
+                lim, dates = 50, p.get("atv_datesopen") or p.get("other_ohv_lt50_datesopen")
+            else:
+                lim, dates = 24, p.get("motorcycle_datesopen")
+            dates = clean(dates)
+            ident = clean(p.get("id")) or ""
+            nm = clean(p.get("name")) or ""
+            label = nm if nm and nm != ident else (f"FR {ident}" if sub == "road" else f"Trail {ident}")
+            key = (label, sub, lim, None if dates in (None, "01/01-12/31") else dates,
+                   1 if (p.get("operationalmaintlevel") or "").startswith("2") else None,
+                   (p.get("forestname") or "").replace(" National Forest", ""),
+                   (clean(p.get("surfacetype")) or "").split(" - ")[-1].title() or None)
+            g = shape(f["geometry"])
+            groups[key] += list(g.geoms) if g.geom_type == "MultiLineString" else [g]
+    feats = []
+    for (label, sub, lim, dates, hc, forest, sf), lines in groups.items():
+        props = {"t": "nf", "sub": sub, "n": label, "lim": lim, "dates": dates, "sea": 1 if dates else None,
+                 "hc": hc, "forest": forest, "sf": sf}
+        props = {k: v for k, v in props.items() if v is not None}
+        merged = linemerge(lines)
+        for part in shapely.get_parts(merged):
+            if part.geom_type != "LineString" or len(part.coords) < 2:
+                continue
+            feats.append({"type": "Feature", "properties": props,
+                          "geometry": {"type": "LineString", "coordinates": [[round(x, 5), round(y, 5)] for x, y in part.coords]}})
+    print(f"national forest {total:>6} segments -> {len(feats)} lines")
     return feats
 
 
@@ -289,6 +346,11 @@ def main():
     print(f"scramble areas     {len(areas):>5}")
 
     road_feats = build_roads()
+    nf_feats = build_nf()
+    road_feats = road_feats + nf_feats
+    (OUT / "roads.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": road_feats},
+                                                  separators=(",", ":")), encoding="utf-8")
+    print(f"roads.geojson {(OUT / 'roads.geojson').stat().st_size / 1e6:.1f} MB (state + national forest)")
     build_pois(features)
 
     n_edges, n_conn = build_graph(features, road_feats, OUT / "graph.json")
