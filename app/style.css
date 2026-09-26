@@ -219,3 +219,16 @@ a { color: #6fa8ff; }
 #update-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--safe-b)); z-index: 1150; background: #2fbf4a; color: #111; }
 
 .sw.cov { height: 14px; background: linear-gradient(90deg, #64b5f6 50%, #0d47a1 50%); opacity: .7; }
+
+/* layers panel groups */
+.grp { border-top: 1px solid var(--line); margin-top: 10px; }
+.grp summary { list-style: none; cursor: pointer; padding: 12px 0; font-weight: 700; display: flex; align-items: center; }
+.grp summary::-webkit-details-marker { display: none; }
+.grp summary::after { content: '\203A'; margin-left: 8px; color: var(--muted); font-size: 20px; transition: transform .15s; }
+.grp[open] summary::after { transform: rotate(90deg); }
+.grp summary small { margin-left: auto; color: var(--muted); font-weight: 400; }
+
+/* grouped place icons */
+.poi.cluster { overflow: visible; }
+.poi.cluster b { position: absolute; top: -8px; right: -10px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  background: #111; color: #fff; border: 1.5px solid #fff; font-size: 11px; line-height: 15px; text-align: center; font-weight: 800; }

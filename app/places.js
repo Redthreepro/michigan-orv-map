@@ -7,7 +7,10 @@ let landLayer = null;
 let waypoints = [];
 const poiLayer = L.layerGroup().addTo(map);
 const wpLayer = L.layerGroup().addTo(map);
-const POI_MIN_ZOOM = { gas: 11, camp: 9, th: 9 };
+const POI_MIN_ZOOM = { gas: 10, camp: 8, th: 7 };
+const CLUSTER_BELOW = 13; // zoom where every icon shows on its own
+// icons closer than this on screen merge into one numbered icon; bigger groups when zoomed out
+const clusterPx = (z) => (z <= 9 ? 120 : z <= 10 ? 100 : z <= 11 ? 84 : 56);
 const MAX_MARKERS = 400;
 for (const k of ['gas', 'camp', 'land', 'wp', 'th']) if (shown[k] === undefined) shown[k] = 1;
 if (shown.cov === undefined) shown.cov = 0; // AT&T coverage: off unless you turn it on
@@ -119,17 +122,44 @@ window.signalAt = (lat, lng) => {
   return inside('good') ? 'good' : inside('any') ? 'weak' : 'none';
 };
 window.loadCoverage = loadCoverage;
+// side-by-side offsets so a gas, a camp and a trailhead group in the same spot don't stack exactly
+const CLUSTER_SHIFT = { gas: [-14, 0], camp: [0, 0], th: [14, 0] };
+function clusterIcon(kind, n) {
+  const [dx, dy] = CLUSTER_SHIFT[kind] || [0, 0];
+  return L.divIcon({ className: 'poi poi-' + kind + ' cluster', html: GLYPH[kind] + `<b>${n > 99 ? '99+' : n}</b>`,
+    iconSize: [28, 28], iconAnchor: [14 - dx, 14 - dy] });
+}
+function placeMarker(p) {
+  return L.marker([p.lat, p.lng], { icon: poiIcon(p.t) }).on('click', (e) => { L.DomEvent.stop(e); showPlace(p); });
+}
 function updatePois() {
   poiLayer.clearLayers();
   if (!window.POIS) return;
   const z = map.getZoom();
   const view = map.getBounds().pad(0.2);
+  const groups = new Map();
   let n = 0;
   for (const p of POIS) {
     if (!POI_MIN_ZOOM[p.t] || !shown[p.t] || z < POI_MIN_ZOOM[p.t] || !view.contains([p.lat, p.lng])) continue;
     if (p.t === 'th' && rig && p.lim && p.lim < rig) continue;
-    L.marker([p.lat, p.lng], { icon: poiIcon(p.t) }).on('click', (e) => { L.DomEvent.stop(e); showPlace(p); }).addTo(poiLayer);
-    if (++n >= MAX_MARKERS) break;
+    if (z >= CLUSTER_BELOW) {
+      placeMarker(p).addTo(poiLayer);
+      if (++n >= MAX_MARKERS) break;
+      continue;
+    }
+    const pt = map.project([p.lat, p.lng], z);
+    const cell = clusterPx(z);
+    const key = `${p.t}:${Math.floor(pt.x / cell)}:${Math.floor(pt.y / cell)}`;
+    const g = groups.get(key);
+    if (g) { g.items.push(p); g.lat += p.lat; g.lng += p.lng; }
+    else groups.set(key, { t: p.t, items: [p], lat: p.lat, lng: p.lng });
+  }
+  for (const g of groups.values()) {
+    if (g.items.length === 1) { placeMarker(g.items[0]).addTo(poiLayer); continue; }
+    const ll = [g.lat / g.items.length, g.lng / g.items.length];
+    L.marker(ll, { icon: clusterIcon(g.t, g.items.length) })
+      .on('click', (e) => { L.DomEvent.stop(e); map.setView(ll, Math.min(z + 2, CLUSTER_BELOW)); })
+      .addTo(poiLayer);
   }
 }
 map.on('moveend', updatePois);

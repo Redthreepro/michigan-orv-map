@@ -286,7 +286,7 @@ document.querySelectorAll('.sheet .close').forEach((b) => b.addEventListener('cl
 map.on('click', () => { closeSheets(); $('#results').hidden = true; });
 
 // ---------- layers panel ----------
-$('#btn-layers').addEventListener('click', () => openSheet('#panel-layers'));
+$('#btn-layers').addEventListener('click', () => { updateGroupCounts(); openSheet('#panel-layers'); });
 document.querySelectorAll('#base-seg button').forEach((b) => b.addEventListener('click', () => setBase(b.dataset.base)));
 document.querySelectorAll('[data-kind]').forEach((cb) => {
   cb.checked = !!shown[cb.dataset.kind];
@@ -459,3 +459,18 @@ rangeInput.addEventListener('change', () => {
   rangeInput.value = v > 0 ? v : '';
   if (window.updateBar) updateBar();
 });
+
+// Layers panel: remember which groups are open and show "N of M on" on each group
+function updateGroupCounts() {
+  document.querySelectorAll('.grp').forEach((g) => {
+    const boxes = [...g.querySelectorAll('input[type=checkbox]')];
+    g.querySelector('.grp-count').textContent = `${boxes.filter((b) => b.checked).length} of ${boxes.length} on`;
+  });
+}
+const openGroups = store.get('openGroups', []);
+document.querySelectorAll('.grp').forEach((g) => {
+  g.open = openGroups.includes(g.dataset.grp);
+  g.addEventListener('toggle', () => store.set('openGroups', [...document.querySelectorAll('.grp[open]')].map((x) => x.dataset.grp)));
+  g.addEventListener('change', updateGroupCounts);
+});
+updateGroupCounts();

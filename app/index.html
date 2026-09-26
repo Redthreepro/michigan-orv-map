@@ -53,27 +53,6 @@
 <!-- layers + settings -->
 <section id="panel-layers" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
-  <h2>Map</h2>
-  <div class="seg" id="base-seg">
-    <button data-base="topo" class="on">Topo</button>
-    <button data-base="sat">Satellite</button>
-  </div>
-  <h2>Show</h2>
-  <label class="row"><input type="checkbox" data-kind="route" checked><i class="sw route"></i>ORV routes <small>up to 64" or 72"</small></label>
-  <label class="row"><input type="checkbox" data-kind="trail" checked><i class="sw trail"></i>ORV / ATV trails <small>50" or less</small></label>
-  <label class="row"><input type="checkbox" data-kind="mc" checked><i class="sw mc"></i>Motorcycle trails</label>
-  <label class="row"><input type="checkbox" data-kind="mccct" checked><i class="sw mccct"></i>Cross Country Cycle Trail</label>
-  <label class="row"><input type="checkbox" data-kind="road" checked><i class="sw road"></i>State &amp; national forest roads <small>zoom in to see</small></label>
-  <label class="row"><input type="checkbox" data-kind="scramble" checked><i class="sw scramble"></i>Scramble areas</label>
-  <label class="row"><input type="checkbox" data-kind="closed" checked><i class="sw closed"></i>Closures &amp; reroutes</label>
-  <label class="row"><input type="checkbox" data-kind="th" checked><i class="poi poi-th sw-poi"></i>ORV trailheads &amp; parking</label>
-  <label class="row"><input type="checkbox" data-kind="gas" checked><i class="poi poi-gas sw-poi"></i>Gas stations <small>zoom in to see</small></label>
-  <label class="row"><input type="checkbox" data-kind="camp" checked><i class="poi poi-camp sw-poi"></i>Campgrounds</label>
-  <label class="row"><input type="checkbox" data-kind="land" checked><i class="sw land"></i>Free camping <small>state &amp; national forest land</small></label>
-  <label class="row"><input type="checkbox" data-kind="cov"><i class="sw cov"></i>AT&amp;T signal <small>FCC map; darker = good</small></label>
-  <label class="row"><input type="checkbox" data-kind="wp" checked><i class="wp wp-pin sw-poi"></i>My waypoints</label>
-  <button id="btn-wp-list" class="ghost">My waypoints <span id="wp-count"></span></button>
-  <button id="btn-help" class="ghost">How to use this map</button>
   <h2>My machine</h2>
   <div class="seg" id="rig-seg">
     <button data-rig="0" class="on">Show all</button>
@@ -84,7 +63,40 @@
   <label class="row">Fuel range
     <input id="fuel-range" class="field range-field" type="number" inputmode="numeric" min="5" max="600" placeholder="miles">
   </label>
-  <p class="hint">Pick your machine's width. Anything it isn't legally allowed on (by DNR trail class) is removed from the map and search.</p>
+
+  <h2>Map</h2>
+  <div class="seg" id="base-seg">
+    <button data-base="topo" class="on">Topo</button>
+    <button data-base="sat">Satellite</button>
+  </div>
+
+  <details class="grp" data-grp="trails">
+    <summary>Trails &amp; roads <small class="grp-count"></small></summary>
+    <label class="row"><input type="checkbox" data-kind="route" checked><i class="sw route"></i>ORV routes <small>up to 64" or 72"</small></label>
+    <label class="row"><input type="checkbox" data-kind="trail" checked><i class="sw trail"></i>ORV / ATV trails <small>50" or less</small></label>
+    <label class="row"><input type="checkbox" data-kind="mc" checked><i class="sw mc"></i>Motorcycle trails</label>
+    <label class="row"><input type="checkbox" data-kind="mccct" checked><i class="sw mccct"></i>Cross Country Cycle Trail</label>
+    <label class="row"><input type="checkbox" data-kind="road" checked><i class="sw road"></i>Forest roads <small>state (teal) &amp; national (brown)</small></label>
+    <label class="row"><input type="checkbox" data-kind="closed" checked><i class="sw closed"></i>Closures &amp; reroutes</label>
+    <label class="row"><input type="checkbox" data-kind="scramble" checked><i class="sw scramble"></i>Scramble areas</label>
+  </details>
+
+  <details class="grp" data-grp="places">
+    <summary>Places <small class="grp-count"></small></summary>
+    <label class="row"><input type="checkbox" data-kind="th" checked><i class="poi poi-th sw-poi"></i>ORV trailheads &amp; parking</label>
+    <label class="row"><input type="checkbox" data-kind="gas" checked><i class="poi poi-gas sw-poi"></i>Gas stations</label>
+    <label class="row"><input type="checkbox" data-kind="camp" checked><i class="poi poi-camp sw-poi"></i>Campgrounds</label>
+    <label class="row"><input type="checkbox" data-kind="wp" checked><i class="wp wp-pin sw-poi"></i>My waypoints</label>
+    <button id="btn-wp-list" class="ghost">My waypoints list <span id="wp-count"></span></button>
+  </details>
+
+  <details class="grp" data-grp="camping">
+    <summary>Camping &amp; signal <small class="grp-count"></small></summary>
+    <label class="row"><input type="checkbox" data-kind="land" checked><i class="sw land"></i>Free camping <small>state &amp; national forest</small></label>
+    <label class="row"><input type="checkbox" data-kind="cov"><i class="sw cov"></i>AT&amp;T signal <small>darker = good</small></label>
+  </details>
+
+  <button id="btn-help" class="ghost">How to use this map</button>
 </section>
 
 <!-- save area -->
