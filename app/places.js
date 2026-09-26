@@ -12,7 +12,7 @@ const CLUSTER_BELOW = 13; // zoom where every icon shows on its own
 // icons closer than this on screen merge into one numbered icon; bigger groups when zoomed out
 const clusterPx = (z) => (z <= 9 ? 120 : z <= 10 ? 100 : z <= 11 ? 84 : 56);
 const MAX_MARKERS = 400;
-for (const k of ['gas', 'camp', 'land', 'wp', 'th']) if (shown[k] === undefined) shown[k] = 1;
+for (const k of ['gas', 'camp', 'land', 'wp', 'th', 'towns']) if (shown[k] === undefined) shown[k] = 1;
 if (shown.cov === undefined) shown.cov = 0; // AT&T coverage: off unless you turn it on
 
 // camping land sits under everything else
@@ -34,7 +34,7 @@ function poiIcon(kind) { return L.divIcon({ className: 'poi poi-' + kind, html: 
 function wpIcon(type) { return L.divIcon({ className: 'wp wp-' + type, html: GLYPH[type] || GLYPH.pin, iconSize: [30, 30], iconAnchor: [15, 30] }); }
 
 // ---------- load ----------
-fetch('data/pois.json').then((r) => r.json()).then((p) => { window.POIS = p; updatePois(); }).catch(() => {});
+fetch('data/pois.json').then((r) => r.json()).then((p) => { window.POIS = p; updatePois(); updateTowns(); }).catch(() => {});
 fetch('data/camping_land.geojson').then((r) => r.json()).then((fc) => {
   LAND = fc.features.map((f) => {
     const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
@@ -86,6 +86,7 @@ function applyPlaces() {
     if (on && !map.hasLayer(landLayer)) landLayer.addTo(map); else if (!on) map.removeLayer(landLayer);
   }
   if (shown.wp) wpLayer.addTo(map); else map.removeLayer(wpLayer);
+  if (typeof updateTowns === 'function') updateTowns();
   if (shown.cov) { if (covLayer) covLayer.addTo(map); else loadCoverage(); } else if (covLayer) map.removeLayer(covLayer);
   updatePois();
 }
@@ -163,6 +164,38 @@ function updatePois() {
   }
 }
 map.on('moveend', updatePois);
+
+// ---------- town names ----------
+// The USGS topo only prints a few town names; draw our own, biggest first, skipping any that would overlap.
+map.createPane('labels').style.zIndex = 650; // above place icons; labels ignore taps so icons stay tappable
+map.getPane('labels').style.pointerEvents = 'none';
+const townLayer = L.layerGroup().addTo(map);
+const LABEL_DROP = 12; // px below the town point
+const townMinPop = (z) => (z <= 6 ? 50000 : z === 7 ? 20000 : z === 8 ? 5000 : z === 9 ? 800 : z === 10 ? 300 : 0);
+function updateTowns() {
+  townLayer.clearLayers();
+  if (!window.POIS || !shown.towns) return;
+  const z = map.getZoom(), min = townMinPop(z);
+  const view = map.getBounds().pad(0.1);
+  const towns = POIS.filter((p) => p.t === 'town' && (p.pop || 0) >= min && view.contains([p.lat, p.lng]))
+    .sort((a, b) => (b.pop || 0) - (a.pop || 0));
+  const placed = [];
+  for (const t of towns) {
+    const big = (t.pop || 0) >= 20000;
+    const w = t.n.length * (big ? 8.2 : 7.2) + 10, h = big ? 20 : 17;
+    // sit the name just below the town point, where gas/camp icons at the town center won't cover it
+    const pt = map.latLngToContainerPoint([t.lat, t.lng]).add([0, LABEL_DROP + h / 2]);
+    const box = [pt.x - w / 2, pt.y - h / 2, pt.x + w / 2, pt.y + h / 2];
+    if (placed.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
+    placed.push(box);
+    L.marker([t.lat, t.lng], {
+      pane: 'labels', interactive: false, keyboard: false,
+      icon: L.divIcon({ className: 'town-label' + (big ? ' big' : ''), html: `<span>${esc(t.n)}</span>`, iconSize: [w, h], iconAnchor: [w / 2, -LABEL_DROP] }),
+    }).addTo(townLayer);
+    if (placed.length >= 120) break;
+  }
+}
+map.on('moveend', updateTowns);
 map.on('zoomend', applyPlaces);
 
 // ---------- place sheet (gas / campground / waypoint) ----------
@@ -323,7 +356,7 @@ $('#btn-wp-gpx').addEventListener('click', () => {
 });
 
 // layer toggles for the new kinds
-document.querySelectorAll('[data-kind="gas"],[data-kind="camp"],[data-kind="land"],[data-kind="wp"],[data-kind="th"],[data-kind="cov"]').forEach((cb) => {
+document.querySelectorAll('[data-kind="gas"],[data-kind="camp"],[data-kind="land"],[data-kind="wp"],[data-kind="th"],[data-kind="cov"],[data-kind="towns"]').forEach((cb) => {
   cb.checked = !!shown[cb.dataset.kind];
   cb.addEventListener('change', applyPlaces);
 });

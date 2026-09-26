@@ -232,3 +232,10 @@ a { color: #6fa8ff; }
 .poi.cluster { overflow: visible; }
 .poi.cluster b { position: absolute; top: -8px; right: -10px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
   background: #111; color: #fff; border: 1.5px solid #fff; font-size: 11px; line-height: 15px; text-align: center; font-weight: 800; }
+
+/* town labels */
+.town-label { display: flex !important; align-items: center; justify-content: center; white-space: nowrap; }
+.town-label span { font: 700 12px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1b1b1b;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 0 0 1px #fff; letter-spacing: .01em; }
+.town-label.big span { font-size: 14px; font-weight: 800; }
+.sw-town { width: 26px; font-style: normal; font-weight: 800; font-size: 13px; text-align: center; color: var(--text); }

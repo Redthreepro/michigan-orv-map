@@ -214,14 +214,14 @@ def build_nf():
 def build_towns():
     """Michigan cities, villages and census places (for search), from the Census Bureau."""
     towns = []
-    for layer in (4, 5):  # incorporated places, census designated places
-        q = urllib.parse.urlencode({"where": "STATE='26'", "outFields": "BASENAME,INTPTLAT,INTPTLON",
+    for layer in (25, 26):  # 2020 Census incorporated + census designated places (these carry population)
+        q = urllib.parse.urlencode({"where": "STATE='26'", "outFields": "BASENAME,INTPTLAT,INTPTLON,POP100",
                                     "returnGeometry": "false", "f": "json"})
         with urllib.request.urlopen(f"{TIGER_PLACES}/{layer}/query?{q}", timeout=120) as r:
             for f in json.load(r).get("features", []):
                 a = f["attributes"]
                 towns.append({"t": "town", "n": a["BASENAME"], "lat": round(float(a["INTPTLAT"]), 4),
-                              "lng": round(float(a["INTPTLON"]), 4)})
+                              "lng": round(float(a["INTPTLON"]), 4), "pop": a.get("POP100") or 0})
     return towns
 
 
