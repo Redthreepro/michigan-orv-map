@@ -10,6 +10,7 @@ const wpLayer = L.layerGroup().addTo(map);
 const POI_MIN_ZOOM = { gas: 11, camp: 9, th: 9 };
 const MAX_MARKERS = 400;
 for (const k of ['gas', 'camp', 'land', 'wp', 'th']) if (shown[k] === undefined) shown[k] = 1;
+if (shown.cov === undefined) shown.cov = 0; // AT&T coverage: off unless you turn it on
 
 // camping land sits under everything else
 map.createPane('land').style.zIndex = 350;
@@ -82,8 +83,42 @@ function applyPlaces() {
     if (on && !map.hasLayer(landLayer)) landLayer.addTo(map); else if (!on) map.removeLayer(landLayer);
   }
   if (shown.wp) wpLayer.addTo(map); else map.removeLayer(wpLayer);
+  if (shown.cov) { if (covLayer) covLayer.addTo(map); else loadCoverage(); } else if (covLayer) map.removeLayer(covLayer);
   updatePois();
 }
+
+// ---------- AT&T coverage (FCC map, built by build_coverage.py) ----------
+map.createPane('cov').style.zIndex = 360;
+map.getPane('cov').style.opacity = 0.3;
+const covRenderer = L.canvas({ pane: 'cov' });
+let COV = null, covLayer = null, covLoading = null;
+function loadCoverage() {
+  if (covLoading) return covLoading;
+  covLoading = fetch('data/coverage.geojson').then((r) => r.json()).then((fc) => {
+    COV = fc.features.map((f) => ({
+      level: f.properties.level,
+      parts: (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates).map((poly) => {
+        let a = 180, b = 90, c = -180, d = -90;
+        for (const [x, y] of poly[0]) { a = Math.min(a, x); b = Math.min(b, y); c = Math.max(c, x); d = Math.max(d, y); }
+        return { bbox: [a, b, c, d], poly };
+      }),
+    }));
+    window.COV_SOURCE = fc.source;
+    covLayer = L.geoJSON(fc, { renderer: covRenderer, interactive: false,
+      style: (f) => ({ stroke: false, fillOpacity: 1, fillColor: f.properties.level === 'good' ? '#0d47a1' : '#64b5f6' }) });
+    if (shown.cov) covLayer.addTo(map);
+  }).catch(() => { covLoading = null; });
+  return covLoading;
+}
+// 'good' | 'weak' | 'none', or null if the coverage file isn't loaded
+window.signalAt = (lat, lng) => {
+  if (!COV) return null;
+  const inside = (level) => COV.filter((f) => f.level === level).some((f) => f.parts.some(({ bbox, poly }) =>
+    lng >= bbox[0] && lng <= bbox[2] && lat >= bbox[1] && lat <= bbox[3]
+    && inRing(lng, lat, poly[0]) && !poly.slice(1).some((h) => inRing(lng, lat, h))));
+  return inside('good') ? 'good' : inside('any') ? 'weak' : 'none';
+};
+window.loadCoverage = loadCoverage;
 function updatePois() {
   poiLayer.clearLayers();
   if (!window.POIS) return;
@@ -258,7 +293,7 @@ $('#btn-wp-gpx').addEventListener('click', () => {
 });
 
 // layer toggles for the new kinds
-document.querySelectorAll('[data-kind="gas"],[data-kind="camp"],[data-kind="land"],[data-kind="wp"],[data-kind="th"]').forEach((cb) => {
+document.querySelectorAll('[data-kind="gas"],[data-kind="camp"],[data-kind="land"],[data-kind="wp"],[data-kind="th"],[data-kind="cov"]').forEach((cb) => {
   cb.checked = !!shown[cb.dataset.kind];
   cb.addEventListener('change', applyPlaces);
 });

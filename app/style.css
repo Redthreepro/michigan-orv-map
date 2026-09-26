@@ -217,3 +217,5 @@ a { color: #6fa8ff; }
 #welcome-rig button { font-size: 14px; }
 
 #update-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--safe-b)); z-index: 1150; background: #2fbf4a; color: #111; }
+
+.sw.cov { height: 14px; background: linear-gradient(90deg, #64b5f6 50%, #0d47a1 50%); opacity: .7; }

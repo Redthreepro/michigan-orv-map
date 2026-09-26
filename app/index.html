@@ -70,6 +70,7 @@
   <label class="row"><input type="checkbox" data-kind="gas" checked><i class="poi poi-gas sw-poi"></i>Gas stations <small>zoom in to see</small></label>
   <label class="row"><input type="checkbox" data-kind="camp" checked><i class="poi poi-camp sw-poi"></i>Campgrounds</label>
   <label class="row"><input type="checkbox" data-kind="land" checked><i class="sw land"></i>Free camping <small>state &amp; national forest land</small></label>
+  <label class="row"><input type="checkbox" data-kind="cov"><i class="sw cov"></i>AT&amp;T signal <small>FCC map; darker = good</small></label>
   <label class="row"><input type="checkbox" data-kind="wp" checked><i class="wp wp-pin sw-poi"></i>My waypoints</label>
   <button id="btn-wp-list" class="ghost">My waypoints <span id="wp-count"></span></button>
   <button id="btn-help" class="ghost">How to use this map</button>
@@ -135,6 +136,7 @@
   <h2>This spot</h2>
   <p class="hint" id="point-coords"></p>
   <p class="hint" id="point-camp" hidden></p>
+  <p class="hint" id="point-signal" hidden></p>
   <div class="rec-row"><button id="btn-route-here" class="primary">Route here</button><button id="btn-add-trip" class="ghost">Add to trip</button></div>
   <div class="rec-row"><button id="btn-route-from" class="ghost">Start trip here</button><button id="btn-save-wp" class="ghost">Save as waypoint</button></div>
   <div class="rec-row"><button id="btn-drive" class="ghost">Drive here (Google Maps)</button><button id="btn-send-dir" class="ghost">Send directions</button></div>

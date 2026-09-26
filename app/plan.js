@@ -235,6 +235,13 @@ function tripWarnings(gas) {
     if (!cg && window.campingAt && !campingAt(s.lat, s.lng).ok) w.push({ level: 'warn', text: `Overnight at "${s.name}" isn't a campground or free-camping land.`, at: [s.lat, s.lng] });
   });
 
+  // overnight stops with no AT&T signal (only once the coverage file has been loaded)
+  if (window.signalAt) plan.stops.forEach((s, i) => {
+    if (!s.night || i === 0 || i === plan.stops.length - 1) return;
+    const sig = signalAt(s.lat, s.lng);
+    if (sig === 'none') w.push({ level: 'info', text: `No AT&T signal at "${s.name}" per the FCC map. Tell someone your plan before you lose service.`, at: [s.lat, s.lng] });
+  });
+
   // long days
   const ds = days();
   if (ds.length > 1) ds.forEach((d, i) => { if (d.s > LONG_DAY_S) w.push({ level: 'warn', text: `Day ${i + 1} is about ${fmtTime(d.s)} of riding. Consider another overnight stop.` }); });
@@ -269,6 +276,11 @@ function tripWarnings(gas) {
 
 function showPlan() {
   if (!plan) return;
+  // camps get a "no signal" note once coverage is loaded; try loading it once per session
+  if (!window.__covTried && window.signalAt && signalAt(0, 0) === null && plan.stops.some((s) => s.night)) {
+    window.__covTried = true;
+    loadCoverage().then(() => { if (window.signalAt(0, 0) !== null && !$('#panel-route').hidden) showPlan(); });
+  }
   const n = plan.stops.length;
   const t = totals(planLegs);
   const isTrip = n > 2 || plan.stops.some((s) => s.night);
@@ -462,6 +474,14 @@ map.on('contextmenu', (e) => {
   const el = $('#point-camp');
   el.hidden = !c;
   if (c) { el.textContent = c.text; el.className = 'hint ' + (c.ok ? 'ok' : 'warn'); }
+  const sig = $('#point-signal');
+  const showSignal = () => {
+    const s = window.signalAt ? signalAt(pressed.lat, pressed.lng) : null;
+    sig.hidden = !s;
+    if (s) sig.textContent = s === 'good' ? 'AT&T signal here: good (FCC map)' : s === 'weak' ? 'AT&T signal here: weak (FCC map)' : 'AT&T signal here: none (FCC map)';
+  };
+  showSignal();
+  if (window.loadCoverage && window.signalAt && signalAt(0, 0) === null) loadCoverage().then(showSignal);
   openSheet('#panel-point');
 });
 $('#btn-route-here').addEventListener('click', () => routeHere(pressed));

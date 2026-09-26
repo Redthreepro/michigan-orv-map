@@ -45,6 +45,9 @@ roads open to ORVs (shown from zoom 10 in).
 - **Fuel range** setting drives the no-gas warnings on trips.
 - **First-open welcome** (machine, fuel range, how to use it; reopen via Layers → How to use this map)
   and an "App updated, tap to reload" banner.
+- **AT&T signal** layer (off by default) from the FCC National Broadband Map: darker = good signal. Long-press
+  shows signal at a spot; trips note camps with no signal. Refresh by downloading the new FCC file by hand
+  (instructions in `build_coverage.py`) and running `python build_coverage.py`.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)
