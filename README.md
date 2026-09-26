@@ -21,6 +21,9 @@ roads open to ORVs (shown from zoom 10 in).
 - **Dispersed camping**: green-shaded state forest land more than 1 mile from a state forest campground
   (DNR rule). Long-press any spot to check it. Rebuild with `python build_land.py` (not nightly).
 - **Waypoints**: save your own spots, route to them, add them to trips, share as GPX.
+- **Offline panel** (download button): a ready-for-no-signal checklist (home-screen app vs browser tab,
+  app files saved, closure data age, storage protected, location allowed, trip map saved) plus
+  one-tap "Download trip map" for a 1-mile corridor along the planned trip (3 mi around camps/ends).
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

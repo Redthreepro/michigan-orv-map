@@ -34,7 +34,7 @@
   <button id="btn-layers" class="fab" aria-label="Layers">
     <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
   </button>
-  <button id="btn-save" class="fab" aria-label="Save area offline">
+  <button id="btn-save" class="fab" aria-label="Offline">
     <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
   <button id="btn-locate" class="fab" aria-label="My location">
@@ -79,17 +79,30 @@
     <button data-rig="72">65–72"</button>
   </div>
   <p class="hint">Pick your machine's width. Anything it isn't legally allowed on (by DNR trail class) is removed from the map and search.</p>
-  <h2>Offline</h2>
-  <p class="hint" id="storage-info">Checking storage…</p>
-  <p class="hint" id="data-info"></p>
-  <button id="btn-clear" class="ghost">Delete saved map tiles</button>
 </section>
 
 <!-- save area -->
 <section id="panel-save" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
-  <h2>Save this area for offline</h2>
-  <p class="hint">Saves the map background for what's on screen right now. Trails are always saved — this is just the topo/satellite imagery underneath.</p>
+  <h2>Offline</h2>
+  <div id="ready-summary" class="ready">Checking…</div>
+  <ul id="ready-list"></ul>
+
+  <div id="trip-dl" hidden>
+    <h2>Get ready for this trip</h2>
+    <p class="hint">Saves the map background along your whole planned trip.</p>
+    <label class="row">Detail
+      <select id="trip-zoom">
+        <option value="14">Normal (zoom 14)</option>
+        <option value="15" selected>High (zoom 15)</option>
+      </select>
+    </label>
+    <label class="row"><input type="checkbox" id="trip-sat"> Include satellite too</label>
+    <p id="trip-est" class="est"></p>
+    <button id="btn-trip-dl" class="primary dl-btn">Download trip map</button>
+  </div>
+
+  <h2>Save the area on screen</h2>
   <label class="row">Detail
     <select id="save-zoom">
       <option value="14">Normal (to zoom 14)</option>
@@ -99,8 +112,14 @@
   </label>
   <label class="row"><input type="checkbox" id="save-sat"> Include satellite too</label>
   <p id="save-est" class="est"></p>
+  <button id="btn-save-go" class="ghost dl-btn">Download this area</button>
+
   <div id="save-progress" hidden><div class="bar"><span></span></div><p class="hint" id="save-status"></p></div>
-  <button id="btn-save-go" class="primary">Download</button>
+
+  <h2>Storage</h2>
+  <p class="hint" id="storage-info">Checking storage…</p>
+  <p class="hint" id="data-info"></p>
+  <button id="btn-clear" class="ghost">Delete saved map tiles</button>
 </section>
 
 <!-- long-press point -->
@@ -154,6 +173,8 @@
   <div id="ride-list"></div>
 </section>
 
+<div id="install-tip" hidden><span id="install-tip-text"></span><button class="x" aria-label="Dismiss">&times;</button></div>
+
 <div id="toast" hidden></div>
 
 <script src="vendor/leaflet.js"></script>
@@ -162,5 +183,6 @@
 <script src="routing.js"></script>
 <script src="places.js"></script>
 <script src="plan.js"></script>
+<script src="offline.js"></script>
 </body>
 </html>

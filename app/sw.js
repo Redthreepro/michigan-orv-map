@@ -1,9 +1,9 @@
 // Bump SHELL when app files change so phones pick up the new version.
-const SHELL = 'orv-shell-v8';
+const SHELL = 'orv-shell-v9';
 const DATA = 'orv-data';
 const TILES = 'orv-tiles';
 const SHELL_FILES = [
-  './', 'index.html', 'app.js', 'tracks.js', 'routing.js', 'places.js', 'plan.js', 'style.css', 'manifest.webmanifest',
+  './', 'index.html', 'app.js', 'tracks.js', 'routing.js', 'places.js', 'plan.js', 'offline.js', 'style.css', 'manifest.webmanifest',
   'vendor/leaflet.js', 'vendor/leaflet.css', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
 const DATA_FILES = ['data/trails.geojson', 'data/roads.geojson', 'data/graph.json', 'data/pois.json', 'data/camping_land.geojson', 'data/meta.json'];
@@ -21,6 +21,30 @@ self.addEventListener('activate', (e) => {
     for (const k of await caches.keys()) if (k.startsWith('orv-shell-') && k !== SHELL) await caches.delete(k);
     await self.clients.claim();
   })());
+});
+
+// The Offline panel asks which files are saved, and can ask to (re)download them.
+self.addEventListener('message', (e) => {
+  const reply = (m) => e.ports[0] && e.ports[0].postMessage(m);
+  const t = e.data && e.data.type;
+  if (t === 'status') {
+    e.waitUntil((async () => {
+      const missing = [];
+      const shell = await caches.open(SHELL), data = await caches.open(DATA);
+      for (const f of SHELL_FILES) if (!(await shell.match(f, { ignoreSearch: true }))) missing.push(f);
+      for (const f of DATA_FILES) if (!(await data.match(f, { ignoreSearch: true }))) missing.push(f);
+      reply({ missing, version: SHELL });
+    })());
+  }
+  if (t === 'repair') {
+    e.waitUntil((async () => {
+      try {
+        await (await caches.open(SHELL)).addAll(SHELL_FILES);
+        await (await caches.open(DATA)).addAll(DATA_FILES);
+        reply({ ok: true });
+      } catch { reply({ ok: false }); }
+    })());
+  }
 });
 
 self.addEventListener('fetch', (e) => {

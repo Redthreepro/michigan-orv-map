@@ -170,3 +170,20 @@ a { color: #6fa8ff; }
 .along li span { display: inline-block; min-width: 64px; color: var(--muted); font-size: 13px; }
 .along li small { display: block; color: var(--muted); margin-left: 64px; }
 .rec-row { margin-top: 8px; }
+
+/* offline panel */
+.ready { font-weight: 800; padding: 10px 12px; border-radius: 10px; margin: 4px 0 8px; }
+.ready.good { background: #1e5b2a; } .ready.warn { background: #6b5a00; } .ready.bad { background: #8b1a1a; }
+#ready-list { list-style: none; padding: 0; margin: 0 0 6px; }
+#ready-list li { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+#ready-list li > div { flex: 1; }
+#ready-list li small { display: block; color: var(--muted); margin-top: 3px; }
+#ready-list i { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 800; font-size: 13px; }
+#ready-list .ok i { background: #1e5b2a; } #ready-list .bad i { background: #c62828; } #ready-list .soft i { background: #a67c00; } #ready-list .info i { background: #3a4138; }
+.ghost.small { width: auto; height: 34px; margin: 0; padding: 0 12px; flex: none; color: var(--text); }
+.fab.alert::after { content: ''; position: absolute; top: 6px; right: 6px; width: 12px; height: 12px; border-radius: 50%; background: #ff9800; border: 2px solid var(--panel); }
+.fab { position: relative; }
+#install-tip { position: fixed; left: 12px; right: 80px; bottom: calc(24px + var(--safe-b)); z-index: 1001; background: #1e6bff; color: #fff;
+  border-radius: 12px; padding: 12px 40px 12px 14px; font-size: 14px; box-shadow: 0 2px 12px #0008; }
+#install-tip[hidden] { display: none; }
+#install-tip .x { position: absolute; top: 4px; right: 4px; width: 34px; height: 34px; border: 0; background: none; color: #fff; font-size: 22px; cursor: pointer; }

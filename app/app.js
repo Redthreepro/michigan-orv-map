@@ -56,7 +56,7 @@ setBase(baseKey);
 map.on('moveend', () => {
   const c = map.getCenter();
   store.set('view', { c: [+c.lat.toFixed(5), +c.lng.toFixed(5)], z: map.getZoom() });
-  if (!$('#panel-save').hidden) updateEstimate();
+  if (!$('#panel-save').hidden && window.updateAreaEstimate) updateAreaEstimate();
 });
 
 // ---------- width fit ----------
@@ -120,7 +120,10 @@ async function loadTrails() {
     buildRoadCells(roads.features);
     applyVisibility();
   }).catch(() => toast('Could not load forest roads'));
-  if (meta) $('#data-info').textContent = `Trail data: Michigan DNR, checked ${meta.built} · ${meta.closures} ORV closure segments.`;
+  if (meta) {
+    $('#data-info').textContent = `Trail data: Michigan DNR, checked ${meta.built} · ${meta.closures} ORV closure segments.`;
+    $('#data-info').dataset.built = meta.built;
+  }
 }
 
 // (re)load only what the selected machine may legally ride
@@ -261,7 +264,7 @@ document.querySelectorAll('.sheet .close').forEach((b) => b.addEventListener('cl
 map.on('click', () => { closeSheets(); $('#results').hidden = true; });
 
 // ---------- layers panel ----------
-$('#btn-layers').addEventListener('click', () => { refreshStorage(); openSheet('#panel-layers'); });
+$('#btn-layers').addEventListener('click', () => openSheet('#panel-layers'));
 document.querySelectorAll('#base-seg button').forEach((b) => b.addEventListener('click', () => setBase(b.dataset.base)));
 document.querySelectorAll('[data-kind]').forEach((cb) => {
   cb.checked = !!shown[cb.dataset.kind];
@@ -280,19 +283,10 @@ function setRig(v) {
 document.querySelectorAll('#rig-seg button').forEach((b) => b.addEventListener('click', () => setRig(+b.dataset.rig)));
 setRig(rig);
 
-async function refreshStorage() {
-  const el = $('#storage-info');
-  try {
-    const c = await caches.open(TILE_CACHE);
-    const n = (await c.keys()).length;
-    const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
-    el.textContent = `${n.toLocaleString()} map tiles saved` + (est ? ` · ${(est.usage / 1e6).toFixed(0)} MB used on this phone` : '');
-  } catch { el.textContent = 'Offline storage not available in this browser.'; }
-}
 $('#btn-clear').addEventListener('click', async () => {
   if (!confirm('Delete all saved map tiles? Trails stay saved.')) return;
   await caches.delete(TILE_CACHE);
-  refreshStorage();
+  if (window.refreshOffline) refreshOffline();
   toast('Saved tiles deleted');
 });
 
@@ -378,85 +372,6 @@ locBtn.addEventListener('click', () => {
   setLocState();
 });
 map.on('dragstart', () => { if (follow) { follow = false; setLocState(); } });
-
-// ---------- save area offline ----------
-const lon2x = (lon, z) => Math.floor(((lon + 180) / 360) * 2 ** z);
-const lat2y = (lat, z) => { const r = (lat * Math.PI) / 180; return Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z); };
-
-function tileList() {
-  const b = map.getBounds();
-  const maxZ = +$('#save-zoom').value;
-  const bases = $('#save-sat').checked ? ['topo', 'sat'] : [baseKey];
-  const urls = [];
-  let kb = 0;
-  for (const base of bases) {
-    for (let z = 6; z <= maxZ; z++) {
-      const x0 = lon2x(b.getWest(), z), x1 = lon2x(b.getEast(), z);
-      const y0 = lat2y(b.getNorth(), z), y1 = lat2y(b.getSouth(), z);
-      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
-        urls.push(BASES[base].replace('{z}', z).replace('{x}', x).replace('{y}', y));
-        kb += TILE_KB[base];
-      }
-      if (urls.length > MAX_SAVE_TILES) return { urls, kb, tooBig: true };
-    }
-  }
-  return { urls, kb, tooBig: false };
-}
-function updateEstimate() {
-  const { urls, kb, tooBig } = tileList();
-  const go = $('#btn-save-go');
-  if (tooBig) {
-    $('#save-est').textContent = 'That area is too big at this detail. Zoom in, or pick lower detail.';
-    go.disabled = true;
-  } else {
-    $('#save-est').textContent = `${urls.length.toLocaleString()} tiles · about ${Math.max(1, Math.round(kb / 1024))} MB`;
-    go.disabled = false;
-  }
-}
-$('#btn-save').addEventListener('click', () => {
-  $('#save-progress').hidden = true;
-  updateEstimate();
-  openSheet('#panel-save');
-});
-$('#save-zoom').addEventListener('change', updateEstimate);
-$('#save-sat').addEventListener('change', updateEstimate);
-
-let saving = false;
-$('#btn-save-go').addEventListener('click', async () => {
-  if (saving) return;
-  if (!navigator.onLine) return toast('You need a connection to download. Do this before you head out.');
-  const { urls, tooBig } = tileList();
-  if (tooBig) return;
-  saving = true;
-  $('#btn-save-go').disabled = true;
-  $('#save-progress').hidden = false;
-  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  const cache = await caches.open(TILE_CACHE);
-  let done = 0, failed = 0, i = 0;
-  const bar = document.querySelector('#save-progress .bar span');
-  const status = $('#save-status');
-  async function worker() {
-    while (i < urls.length) {
-      const url = urls[i++];
-      try {
-        if (!(await cache.match(url))) {
-          const r = await fetch(url, { mode: 'cors' });
-          if (r.ok) await cache.put(url, r); else failed++;
-        }
-      } catch { failed++; }
-      done++;
-      if (done % 10 === 0 || done === urls.length) {
-        bar.style.width = (100 * done / urls.length).toFixed(1) + '%';
-        status.textContent = `${done.toLocaleString()} / ${urls.length.toLocaleString()}` + (failed ? ` · ${failed} failed` : '');
-      }
-    }
-  }
-  await Promise.all(Array.from({ length: 8 }, worker));
-  saving = false;
-  $('#btn-save-go').disabled = false;
-  status.textContent = failed ? `Done, but ${failed} tiles failed. Tap Download again to retry those.` : 'Saved. This area works with no signal.';
-  toast(failed ? 'Saved with some gaps' : 'Area saved for offline');
-});
 
 // ---------- misc ----------
 let toastT;
