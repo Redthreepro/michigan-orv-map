@@ -18,6 +18,7 @@ ROADS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_
 ROADS_WHERE = ("RoadORVUse IN ('DNR Roads Open to ORVs','DNR Roads Seasonally Closed to ORVs',"
                "'Military Roads Open to ORVs','Military Roads Seasonally Closed to ORVs')")
 PARKS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/ArcGIS/rest/services/dnrParksAndRecreation/FeatureServer"
+TIGER_PLACES = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer"
 MVUM = "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_MVUM_02/MapServer"
 MI_FORESTS = ("Huron-Manistee National Forest", "Hiawatha National Forest", "Ottawa National Forest")
 ASSETS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNRReferenceAssetsOPENDATA/FeatureServer"
@@ -210,6 +211,20 @@ def build_nf():
     return feats
 
 
+def build_towns():
+    """Michigan cities, villages and census places (for search), from the Census Bureau."""
+    towns = []
+    for layer in (4, 5):  # incorporated places, census designated places
+        q = urllib.parse.urlencode({"where": "STATE='26'", "outFields": "BASENAME,INTPTLAT,INTPTLON",
+                                    "returnGeometry": "false", "f": "json"})
+        with urllib.request.urlopen(f"{TIGER_PLACES}/{layer}/query?{q}", timeout=120) as r:
+            for f in json.load(r).get("features", []):
+                a = f["attributes"]
+                towns.append({"t": "town", "n": a["BASENAME"], "lat": round(float(a["INTPTLAT"]), 4),
+                              "lng": round(float(a["INTPTLON"]), 4)})
+    return towns
+
+
 def orv_part(text):
     """'Snowmobile Trail LP 35 / ORV Lincoln Hills / ORV Little Manistee' -> 'ORV Lincoln Hills / ORV Little Manistee'."""
     parts = [p.strip(" .") for p in re.split(r"\s*/\s*|\s*\.\s+", text or "") if p.strip(" .")]
@@ -317,10 +332,14 @@ def build_pois(trail_features):
             pois.append({"t": "camp", "n": tags.get("name") or sub, "sub": sub, "lat": round(lat, 5),
                          "lng": round(lng, 5), "ph": tags.get("phone"), "fee": tags.get("fee"),
                          "web": tags.get("website")})
+    try:
+        pois += build_towns()
+    except Exception as err:
+        print(f"town list fetch failed ({err}); search will skip towns this run")
     pois = [{k: v for k, v in p.items() if v is not None} for p in pois]
     (OUT / "pois.json").write_text(json.dumps(pois, separators=(",", ":")), encoding="utf-8")
     print(f"pois          {sum(p['t'] == 'gas' for p in pois)} gas, {sum(p['t'] == 'camp' for p in pois)} campgrounds, "
-          f"{sum(p['t'] == 'th' for p in pois)} ORV trailheads/parking")
+          f"{sum(p['t'] == 'th' for p in pois)} ORV trailheads/parking, {sum(p['t'] == 'town' for p in pois)} towns")
 
 
 def main():

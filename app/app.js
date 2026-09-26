@@ -314,24 +314,47 @@ $('#btn-clear').addEventListener('click', async () => {
 });
 
 // ---------- search ----------
+// Towns first, then trails & routes, trailheads, campgrounds, gas. Word-start matches rank above mid-word ones.
 const search = $('#search');
 const results = $('#results');
+const POI_LABEL = { town: 'Town', th: 'ORV trailhead / parking', camp: 'Campground', gas: 'Gas station' };
 search.addEventListener('input', () => {
   const q = search.value.trim().toLowerCase();
   if (q.length < 2) { results.hidden = true; return; }
-  const hits = [...nameIndex.values()].filter((e) => e.n.toLowerCase().includes(q)).slice(0, 25);
+  // every typed word must appear; rank by where the first word lands
+  const words = q.split(/\s+/);
+  const starts = words.map((w) => new RegExp('(^|[^a-z0-9])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  const score = (name) => {
+    const n = name.toLowerCase();
+    // the first word may match mid-word ("manistee" in "Little Manistee"); later words must start a word
+    if (!n.includes(words[0]) || !starts.slice(1).every((re) => re.test(n))) return -1;
+    const i = n.indexOf(words[0]);
+    return i === 0 ? 0 : /\W/.test(n[i - 1]) ? 1 : 2;
+  };
+  const found = [];
+  const rank = { town: 0, trail: 1, th: 2, camp: 3, gas: 4 };
+  for (const e of nameIndex.values()) { const s = score(e.n); if (s >= 0) found.push({ ...e, s, r: rank.trail }); }
   for (const p of window.POIS || []) {
-    if (p.t === 'th' && p.n.toLowerCase().includes(q) && hits.length < 30) hits.push({ n: p.n, kind: 'th', poi: p });
+    if (p.t === 'gas' && q.length < 3) continue;
+    const label = p.t === 'gas' && p.city ? `${p.n} · ${p.city}` : p.n;
+    const s = score(label);
+    if (s >= 0) found.push({ n: label, poi: p, s, r: rank[p.t] ?? 5, sub: p.t === 'camp' ? p.sub : POI_LABEL[p.t] });
   }
+  found.sort((a, b) => a.s - b.s || a.r - b.r || a.n.localeCompare(b.n));
+  const hits = found.slice(0, 30);
   results.innerHTML = hits.length
-    ? hits.map((e, i) => `<li data-i="${i}">${esc(e.n)}<small>${e.poi ? 'ORV trailhead / parking' : KIND[e.kind].label}${e.co ? ' · ' + esc(e.co) + ' County' : ''}</small></li>`).join('')
+    ? hits.map((e, i) => `<li data-i="${i}">${esc(e.n)}<small>${esc(e.poi ? e.sub || POI_LABEL[e.poi.t] || '' : KIND[e.kind].label)}${e.co ? ' · ' + esc(e.co) + ' County' : ''}</small></li>`).join('')
     : '<li>No matches</li>';
   results.hidden = false;
   results.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
     const e = hits[+li.dataset.i];
-    if (e.poi) { results.hidden = true; search.blur(); map.setView([e.poi.lat, e.poi.lng], 14); return showPlace(e.poi); }
-    map.fitBounds(e.b, { padding: [40, 40], maxZoom: 15 });
     results.hidden = true; search.blur();
+    if (e.poi) {
+      if (e.poi.t === 'town') return map.setView([e.poi.lat, e.poi.lng], 12);
+      map.setView([e.poi.lat, e.poi.lng], 14);
+      return showPlace(e.poi);
+    }
+    map.fitBounds(e.b, { padding: [40, 40], maxZoom: 15 });
     let first = null;
     layers[e.kind].eachLayer((l) => { if (!first && l.feature.properties.n === e.n) first = l; });
     if (first) showDetail(first.feature, first);
@@ -413,3 +436,13 @@ addEventListener('online', netState); addEventListener('offline', netState); net
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 loadTrails().catch(() => toast('Could not load trail data'));
+
+// fuel range (miles) for trip gas warnings
+const rangeInput = $('#fuel-range');
+rangeInput.value = store.get('range', '') || '';
+rangeInput.addEventListener('change', () => {
+  const v = Math.round(+rangeInput.value);
+  store.set('range', v > 0 ? v : 0);
+  rangeInput.value = v > 0 ? v : '';
+  if (window.updateBar) updateBar();
+});

@@ -84,7 +84,7 @@ function updatePois() {
   const view = map.getBounds().pad(0.2);
   let n = 0;
   for (const p of POIS) {
-    if (!shown[p.t] || z < POI_MIN_ZOOM[p.t] || !view.contains([p.lat, p.lng])) continue;
+    if (!POI_MIN_ZOOM[p.t] || !shown[p.t] || z < POI_MIN_ZOOM[p.t] || !view.contains([p.lat, p.lng])) continue;
     if (p.t === 'th' && rig && p.lim && p.lim < rig) continue;
     L.marker([p.lat, p.lng], { icon: poiIcon(p.t) }).on('click', (e) => { L.DomEvent.stop(e); showPlace(p); }).addTo(poiLayer);
     if (++n >= MAX_MARKERS) break;

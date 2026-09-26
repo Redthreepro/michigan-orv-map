@@ -207,3 +207,5 @@ a { color: #6fa8ff; }
 .wx-p span { color: var(--muted); }
 .wx-p small { color: var(--muted); }
 .primary.alt { background: #2fbf4a; }
+
+.range-field { width: 110px; margin: 0 0 0 auto; text-align: right; }

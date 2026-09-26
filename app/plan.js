@@ -215,8 +215,17 @@ function tripWarnings(gas) {
     const marks = [0, ...gas.map((g) => g.at), t.m];
     let worst = { len: 0, a: 0 };
     for (let i = 1; i < marks.length; i++) if (marks[i] - marks[i - 1] > worst.len) worst = { len: marks[i] - marks[i - 1], a: marks[i - 1] };
-    if (!gas.length && t.m > 16093) w.push({ level: 'warn', text: `No gas within 2 miles of the whole ${fmtMi(t.m)} route. Carry enough fuel.` });
-    else if (worst.len > NO_GAS_WARN_M) w.push({ level: 'warn', text: `${fmtMi(worst.len)} with no gas nearby (mile ${mile(worst.a)} to ${mile(worst.a + worst.len)}). Make sure your range covers it.`, at: pointAtTrip(worst.a + worst.len / 2) });
+    // gas stops are 2 mi off route at most: count the detour both ways against your range
+    const range = (+store.get('range', 0) || 0) * 1609.344;
+    const stretch = worst.len + (gas.length ? 2 * 3219 : 0);
+    const where = `(mile ${mile(worst.a)} to ${mile(worst.a + worst.len)})`;
+    const at = pointAtTrip(worst.a + worst.len / 2);
+    if (range) {
+      if (!gas.length && t.m > range) w.push({ level: 'bad', text: `No gas within 2 miles of this ${fmtMi(t.m)} route, and your range is ${fmtMi(range)}. Carry extra fuel.` });
+      else if (stretch > range) w.push({ level: 'bad', text: `${fmtMi(worst.len)} with no gas nearby ${where}, more than your ${fmtMi(range)} fuel range.`, at });
+      else if (stretch > range * 0.8) w.push({ level: 'warn', text: `${fmtMi(worst.len)} with no gas nearby ${where}, close to your ${fmtMi(range)} fuel range.`, at });
+    } else if (!gas.length && t.m > 16093) w.push({ level: 'warn', text: `No gas within 2 miles of the whole ${fmtMi(t.m)} route. Carry enough fuel. (Set your fuel range in Layers for exact warnings.)` });
+    else if (worst.len > NO_GAS_WARN_M) w.push({ level: 'warn', text: `${fmtMi(worst.len)} with no gas nearby ${where}. Set your fuel range in Layers to check it.`, at });
   }
 
   // camping at overnight stops
@@ -372,6 +381,7 @@ $('#route-body').addEventListener('click', async (e) => {
   if (li && li.dataset.camp) { const c = window.__along.camps[+li.dataset.camp]; showPlace(c.p); }
 });
 
+window.updateBar = updateBar;
 function updateBar() {
   const bar = $('#route-bar');
   if (!plan) { bar.hidden = true; return; }

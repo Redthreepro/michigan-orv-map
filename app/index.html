@@ -17,7 +17,7 @@
 <div id="map"></div>
 
 <div id="topbar">
-  <input id="search" type="search" placeholder="Search trails & routes" autocomplete="off">
+  <input id="search" type="search" placeholder="Search towns, trails, campgrounds, gas" autocomplete="off">
   <span id="net" class="pill" hidden>Offline</span>
   <ul id="results" hidden></ul>
 </div>
@@ -79,6 +79,9 @@
     <button data-rig="64">51–64"</button>
     <button data-rig="72">65–72"</button>
   </div>
+  <label class="row">Fuel range
+    <input id="fuel-range" class="field range-field" type="number" inputmode="numeric" min="5" max="600" placeholder="miles">
+  </label>
   <p class="hint">Pick your machine's width. Anything it isn't legally allowed on (by DNR trail class) is removed from the map and search.</p>
 </section>
 
