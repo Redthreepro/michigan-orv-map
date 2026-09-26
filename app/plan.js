@@ -231,9 +231,14 @@ function tripWarnings(gas) {
   if (ds.length > 1) ds.forEach((d, i) => { if (d.s > LONG_DAY_S) w.push({ level: 'warn', text: `Day ${i + 1} is about ${fmtTime(d.s)} of riding. Consider another overnight stop.` }); });
   else if (t.s > LONG_DAY_S) w.push({ level: 'warn', text: `About ${fmtTime(t.s)} of riding. Consider an overnight stop.` });
 
+  // difficulty the DNR flags on the route
+  const x4 = planLegs.reduce((a, r) => a + (r.x4 || 0), 0), hc = planLegs.reduce((a, r) => a + (r.hc || 0), 0);
+  if (x4 > 50) w.push({ level: 'warn', text: `${fmtMi(x4)} is marked "4x4 and high clearance required" by the DNR.` });
+  if (hc > 50) w.push({ level: 'warn', text: `${fmtMi(hc)} is marked "high clearance required" by the DNR.` });
+
   // seasonal / military
   const sea = planLegs.reduce((a, r) => a + (r.seasonal || 0), 0);
-  if (sea > 50) w.push({ level: 'warn', text: `${fmtMi(sea)} on forest roads closed to ORVs part of the year. Tap the dashed teal roads for the dates.` });
+  if (sea > 50) w.push({ level: 'warn', text: `${fmtMi(sea)} on roads or connectors that are closed to ORVs part of the year. Tap the dashed lines for the dates.` });
   if (planLegs.some((r) => r.military > 50)) w.push({ level: 'warn', text: 'Crosses Camp Grayling military roads, which can close for training without notice.' });
 
   // where to unload
@@ -268,6 +273,8 @@ function showPlan() {
   if (warns.length) {
     html += '<div class="warns"><b>Heads up</b>' + warns.map((x, i) => `<div class="w ${x.level}" data-w="${i}">${esc(x.text)}</div>`).join('') + '</div>';
   } else if (planLegs.length) html += '<div class="warns ok"><b>No problems found</b> on this route.</div>';
+
+  if (n >= 1 && !plan.stops[0].mine) html += `<div class="rec-row"><button class="ghost" id="btn-plan-drive">Drive to the start (Google Maps)</button><button class="ghost" id="btn-plan-send">Send directions</button></div>`;
 
   const ds = n >= 2 ? days() : [];
   if (ds.length > 1) {
@@ -323,10 +330,12 @@ function showPlan() {
     }
     window.__along = { gas, camps };
   }
+  html += '<div id="trip-weather"></div>';
   html += `<p class="hint">Routes use DNR data only and skip closed segments. Always follow posted signs.</p>`;
   html += `<div class="rec-row"><button class="ghost" id="btn-plan-gpx">Share GPX</button><button class="ghost" id="btn-plan-clear">Clear</button></div>`;
   $('#route-body').innerHTML = html;
   openSheet('#panel-route');
+  if (window.fillTripWeather && n >= 2) fillTripWeather();
 }
 
 $('#route-body').addEventListener('click', async (e) => {
@@ -336,6 +345,8 @@ $('#route-body').addEventListener('click', async (e) => {
     if (plan && plan.stops.length > 2 && !confirm('Clear this whole trip?')) return;
     return clearPlan();
   }
+  if (btn && btn.id === 'btn-plan-drive') return driveTo(plan.stops[0].lat, plan.stops[0].lng);
+  if (btn && btn.id === 'btn-plan-send') return sendDirections(plan.stops[0].lat, plan.stops[0].lng, plan.stops[0].name);
   if (btn && btn.id === 'btn-plan-gpx') return shareGpx(plan.stops.some((s) => s.night) ? 'ORV trip' : 'ORV route', planGpx());
   if (btn && li && li.classList.contains('stop')) {
     const i = +li.dataset.i, a = btn.dataset.a, st = plan.stops;
@@ -447,6 +458,8 @@ $('#btn-route-here').addEventListener('click', () => routeHere(pressed));
 $('#btn-add-trip').addEventListener('click', () => addToTrip(pressed));
 $('#btn-route-from').addEventListener('click', () => startHere(pressed));
 $('#btn-save-wp').addEventListener('click', () => editWaypoint({ lat: pressed.lat, lng: pressed.lng }));
+$('#btn-drive').addEventListener('click', () => driveTo(pressed.lat, pressed.lng));
+$('#btn-send-dir').addEventListener('click', () => sendDirections(pressed.lat, pressed.lng, 'this spot'));
 
 // ---------- live progress + rerouting ----------
 function nearestOnPlan(lat, lng) {

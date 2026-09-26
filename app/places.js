@@ -107,6 +107,7 @@ function showPlace(p, wp) {
     if (wp) html += `<div class="note ${c.ok ? '' : 'restrict'}">${esc(c.text)}</div>`;
   }
   html += `<div class="rec-row"><button class="primary" data-a="route">Route here</button><button class="ghost" data-a="trip">Add to trip</button></div>`;
+  html += DIR_BTNS;
   html += wp
     ? `<div class="rec-row"><button class="ghost" data-a="edit">Edit</button><button class="ghost danger" data-a="del">Delete</button></div>`
     : `<button class="ghost" data-a="save">Save as waypoint</button>`;
@@ -117,12 +118,29 @@ function showPlace(p, wp) {
     if (a === 'route') routeHere(ll, name);
     if (a === 'trip') addToTrip(ll, name);
     if (a === 'save') editWaypoint({ lat: p.lat, lng: p.lng, name, type: p.t === 'gas' ? 'gas' : 'camp' });
+    if (a === 'drive') driveTo(p.lat, p.lng);
+    if (a === 'send') sendDirections(p.lat, p.lng, name);
     if (a === 'edit') editWaypoint(wp);
     if (a === 'del' && confirm(`Delete waypoint "${wp.name}"?`)) { await tx('readwrite', (s) => s.delete(wp.id), 'waypoints'); closeSheets(); loadWaypoints(); }
   };
   openSheet('#sheet');
 }
 window.showPlace = showPlace;
+
+// ---------- driving directions in Google Maps ----------
+const gmapsUrl = (lat, lng) => `https://www.google.com/maps/dir/?api=1&destination=${(+lat).toFixed(6)},${(+lng).toFixed(6)}&travelmode=driving`;
+function driveTo(lat, lng) { window.open(gmapsUrl(lat, lng), '_blank', 'noopener'); }
+async function sendDirections(lat, lng, name) {
+  const url = gmapsUrl(lat, lng);
+  if (navigator.share) {
+    try { await navigator.share({ title: name, text: `Directions to ${name}`, url }); return; } catch (err) { if (err.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Directions link copied. Paste it in a text to yourself.'); }
+  catch { prompt('Copy this directions link:', url); }
+}
+window.driveTo = driveTo;
+window.sendDirections = sendDirections;
+const DIR_BTNS = `<div class="rec-row"><button class="ghost" data-a="drive">Drive here (Google Maps)</button><button class="ghost" data-a="send">Send directions</button></div>`;
 
 // ---------- trailheads / ORV parking ----------
 const limLabel = (lim) => (lim === 24 ? 'motorcycles only' : lim ? `up to ${lim}"` : '');
@@ -137,7 +155,8 @@ function showTrailhead(p) {
     }).join('') + '</ul>';
   } else html += '<p class="hint warn">No DNR route or trail within about half a mile.</p>';
   html += '<p class="hint">DNR data doesn\'t list lot size. Check that it fits your trailer before you commit.</p>';
-  html += `<button class="primary" data-a="start">Start a trip from here</button>
+  html += `<div class="rec-row"><button class="primary" data-a="drive">Drive here (Google Maps)</button><button class="ghost" data-a="send">Send directions</button></div>
+    <button class="primary alt" data-a="start">Start a trip from here</button>
     <div class="rec-row"><button class="ghost" data-a="route">Route here</button><button class="ghost" data-a="trip">Add to trip</button></div>
     <button class="ghost" data-a="save">Save as waypoint</button>`;
   $('#sheet-body').innerHTML = html;
@@ -148,6 +167,8 @@ function showTrailhead(p) {
     if (a === 'route') routeHere(ll, p.n);
     if (a === 'trip') addToTrip(ll, p.n);
     if (a === 'save') editWaypoint({ lat: p.lat, lng: p.lng, name: p.n, type: 'trailhead' });
+    if (a === 'drive') driveTo(p.lat, p.lng);
+    if (a === 'send') sendDirections(p.lat, p.lng, p.n);
   };
   openSheet('#sheet');
 }

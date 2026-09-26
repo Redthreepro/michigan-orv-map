@@ -8,7 +8,7 @@ const MAX_SPEED = 6.7;
 const MIN_STEP_M = 650; // fold blips shorter than this into the surrounding step
 const CELL = 0.02;                 // edge grid for snapping, ~1.5 km
 const MAX_SNAP_M = 25000;          // don't snap to trails more than ~15 mi away
-const FLAG = { closed: 1, seasonal: 2, military: 4, connector: 8 };
+const FLAG = { closed: 1, seasonal: 2, military: 4, connector: 8, hc: 16, x4: 32 };
 
 let G = null;          // loaded graph
 let loading = null;
@@ -283,13 +283,15 @@ function assemble(S, T, sol, reachedNode) {
 function summarize(legs, S, T, gap) {
   let meters = 0, secs = 0;
   const byKind = {}, steps = [];
-  let seasonal = 0, military = 0;
+  let seasonal = 0, military = 0, hc = 0, x4 = 0;
   for (const leg of legs) {
     const [kind, , name, flags] = G.attrs[G.eattr[leg.e]];
     meters += leg.meters; secs += leg.meters / (SPEED[kind] || 5);
     byKind[kind] = (byKind[kind] || 0) + leg.meters;
     if (flags & FLAG.seasonal) seasonal += leg.meters;
     if (flags & FLAG.military) military += leg.meters;
+    if (flags & FLAG.hc) hc += leg.meters;
+    if (flags & FLAG.x4) x4 += leg.meters;
     const label = kind === 'connector' ? null : (name || KIND[kind].label);
     const last = steps[steps.length - 1];
     if (!label || (last && last.label === label)) { if (last) last.meters += leg.meters; }
@@ -308,7 +310,7 @@ function summarize(legs, S, T, gap) {
     if (folded[i].label === folded[i - 1].label) { folded[i - 1].meters += folded[i].meters; folded.splice(i, 1); }
   }
   return {
-    legs, meters, secs, byKind, steps: folded, seasonal, military, gap,
+    legs, meters, secs, byKind, steps: folded, seasonal, military, hc, x4, gap,
     offStart: S.d, offEnd: T.d, startPt: [S.lat, S.lng], endPt: [T.lat, T.lng],
   };
 }

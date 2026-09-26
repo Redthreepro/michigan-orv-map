@@ -30,6 +30,14 @@ roads open to ORVs (shown from zoom 10 in).
   stretches, overnight stops that aren't legal camping, long days, seasonal/military roads, nearest ORV
   parking if you don't start at one, stale closure data. Roads/trails lying along a closure are also
   closed for routing.
+- **Driving directions**: "Drive here (Google Maps)" / "Send directions" on trailheads, campgrounds, gas,
+  waypoints, any long-pressed spot, and the trip start.
+- **Import GPX**: a trip shared from this app (stops + overnights), waypoints, or tracks from any GPS app.
+  Works with AirDrop, no signal needed.
+- **Backup / Restore**: rides, waypoints, trip, and settings to a JSON file (iCloud/Google Drive via share).
+- **Difficulty flags**: DNR "High clearance" / "4x4 + high clearance" tags on trails and trip warnings;
+  MDOT seasonal connectors count as seasonal.
+- **Weather**: National Weather Service forecast for trip start, camps, and end; saved for offline.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

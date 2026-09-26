@@ -221,7 +221,7 @@ function showDetail(f, clicked, latlng) {
     ['County', p.co], ['Runs on', p.rd],
   ].filter(([, v]) => v);
   let html = `<h3>${esc(p.n || KIND[p.t].label)}</h3>
-    <span class="tag kind">${esc(KIND[p.t].label)}</span>${status ? `<span class="tag ${cls}">${esc(status)}</span>` : ''}`;
+    <span class="tag kind">${esc(KIND[p.t].label)}</span>${status ? `<span class="tag ${cls}">${esc(status)}</span>` : ''}${p.hc === 2 ? '<span class="tag reroute">4x4 + high clearance</span>' : p.hc === 1 ? '<span class="tag reroute">High clearance</span>' : ''}`;
   if (rows.length) html += '<dl>' + rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>';
   if (p.r) html += `<div class="note restrict">${esc(p.r)}</div>`;
   if (p.t === 'road' && p.od) html += `<div class="note restrict">DNR ORV dates for this road: opening ${esc(p.od)}, closing ${esc(p.cd || '?')}.</div>`;

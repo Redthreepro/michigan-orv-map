@@ -4,7 +4,7 @@ Every line is split wherever it touches or crosses another line, and dangling en
 just short of another line (DNR digitizing gaps) get a short connector. The phone runs A* on it.
 
 Output (graph.json):
-  attrs: [[kind, lim, name, flags], ...]   flags: 1 closed, 2 seasonal, 4 military, 8 connector
+  attrs: [[kind, lim, name, flags], ...]   flags: 1 closed, 2 seasonal, 4 military, 8 connector, 16 high clearance, 32 4x4 + high clearance
   edges: [[attr_index, length_m, [x0, y0, dx1, dy1, ...]], ...]   coords are lng/lat * 1e5, delta-encoded
 """
 import json
@@ -46,7 +46,8 @@ def build_graph(trail_features, road_features, out_path):
         p = f["properties"]
         if p["t"] not in ("route", "trail", "mc", "mccct", "road"):
             continue
-        flags = (1 if "closed" in (p.get("s") or "").lower() else 0) | (2 if p.get("sea") else 0) | (4 if p.get("mil") else 0)
+        flags = ((1 if "closed" in (p.get("s") or "").lower() else 0) | (2 if p.get("sea") else 0)
+                 | (4 if p.get("mil") else 0) | (16 if p.get("hc") == 1 else 32 if p.get("hc") == 2 else 0))
         a = attr_id((p["t"], p.get("lim") or 999, p.get("n") or "", flags))
         g = f["geometry"]
         parts = [g["coordinates"]] if g["type"] == "LineString" else g["coordinates"]

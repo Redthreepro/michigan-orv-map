@@ -98,6 +98,10 @@ def slim(p, kind, name_field):
         "co": clean(p.get("County")),
         "lic": clean(p.get("LicenseType")),
         "lim": legal_limit(p, kind),
+        # difficulty/season flags the DNR puts in the restriction text
+        "hc": 2 if "4x4" in (p.get("SpecialRestrictionType") or "") else
+              1 if "High Clearance" in (p.get("SpecialRestrictionType") or "") else None,
+        "sea": 1 if re.search(r"Seasonal|Season ", p.get("SpecialRestrictionType") or "") else None,
         "rd": {"No": "Trail", "1": None, "-2": None}.get(clean(p.get("TrailOnRoad")), clean(p.get("TrailOnRoad"))),
     }
     # comments that just repeat the name are noise

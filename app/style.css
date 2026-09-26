@@ -199,3 +199,11 @@ a { color: #6fa8ff; }
 .warns .w.bad { border-color: #e53935; }
 .warns .w.warn { border-color: #ffb300; }
 .warns .w.info { border-color: #1e6bff; color: var(--muted); }
+
+/* weather */
+.wx { background: var(--bg); border-radius: 10px; padding: 8px 10px; margin: 6px 0; }
+.wx > b { display: block; margin-bottom: 4px; }
+.wx-p { display: grid; grid-template-columns: 96px 40px 1fr; gap: 6px; align-items: baseline; padding: 3px 0; font-size: 14px; }
+.wx-p span { color: var(--muted); }
+.wx-p small { color: var(--muted); }
+.primary.alt { background: #2fbf4a; }

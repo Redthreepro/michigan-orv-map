@@ -186,6 +186,16 @@ async function checks() {
   } else {
     out.push({ ok: true, soft: true, info: true, text: 'No trip planned. Save the areas you\'ll ride below, or plan a trip first.' });
   }
+  // rides / waypoints backup
+  const rides = (await allTracks().catch(() => [])).filter((t) => t.done).length;
+  const wpsN = ((await tx('readonly', (s) => s.count(), 'waypoints').catch(() => 0)) || 0);
+  if (rides + wpsN > 0) {
+    let last = 0;
+    try { last = +localStorage.getItem('orv.lastBackup') || 0; } catch {}
+    const days = last ? Math.floor((Date.now() - last) / 86400000) : null;
+    out.push(last && days <= 30 ? { ok: true, text: `Rides & waypoints backed up ${days === 0 ? 'today' : days + ' days ago'}.` }
+      : { ok: false, soft: true, text: last ? `Last backup was ${days} days ago.` : `${rides} ride(s) and ${wpsN} waypoint(s) aren't backed up anywhere.`, action: 'backup', label: 'Back up' });
+  }
   if (IS_IOS) out.push({ info: true, text: 'Ride days on iPhone: set Settings → Display & Brightness → Auto-Lock → Never. GPS pauses when the screen locks.' });
   return out;
 }
@@ -223,6 +233,7 @@ $('#ready-list').addEventListener('click', async (e) => {
   if (c.action === 'persist') { const ok = await navigator.storage.persist().catch(() => false); toast(ok ? 'Storage protected' : 'The phone declined. It usually allows this for home-screen apps you use often.'); }
   if (c.action === 'locate') { ensureGpsFix(); setTimeout(refreshOffline, 4000); return; }
   if (c.action === 'trip') return downloadTrip();
+  if (c.action === 'backup') return backupAll();
   refreshOffline();
 });
 

@@ -120,6 +120,8 @@
   <h2>Storage</h2>
   <p class="hint" id="storage-info">Checking storage…</p>
   <p class="hint" id="data-info"></p>
+  <div class="rec-row"><button id="btn-backup" class="ghost">Back up rides &amp; waypoints</button><button id="btn-restore" class="ghost">Restore backup</button></div>
+  <p class="hint">Saves a file you can keep in iCloud Drive or Google Drive. Rides and waypoints otherwise live only on this phone.</p>
   <button id="btn-clear" class="ghost">Delete saved map tiles</button>
 </section>
 
@@ -131,6 +133,7 @@
   <p class="hint" id="point-camp" hidden></p>
   <div class="rec-row"><button id="btn-route-here" class="primary">Route here</button><button id="btn-add-trip" class="ghost">Add to trip</button></div>
   <div class="rec-row"><button id="btn-route-from" class="ghost">Start trip here</button><button id="btn-save-wp" class="ghost">Save as waypoint</button></div>
+  <div class="rec-row"><button id="btn-drive" class="ghost">Drive here (Google Maps)</button><button id="btn-send-dir" class="ghost">Send directions</button></div>
 </section>
 
 <!-- route -->
@@ -161,6 +164,14 @@
   <h2>My waypoints</h2>
   <div id="wp-list"></div>
   <button id="btn-wp-gpx" class="ghost">Share all as GPX</button>
+  <button class="ghost btn-import">Import GPX</button>
+</section>
+
+<!-- GPX import -->
+<section id="panel-import" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <h2>Import GPX</h2>
+  <div id="import-body"></div>
 </section>
 
 <!-- rides -->
@@ -172,6 +183,7 @@
   <p class="hint">Keep the app open on screen while you ride. Phones stop GPS for web apps when the screen is off or you switch apps. The screen stays on while recording, so plug in if you can.</p>
   <h2>Saved rides</h2>
   <div id="ride-list"></div>
+  <button class="ghost btn-import">Import GPX (rides, waypoints, a shared trip)</button>
 </section>
 
 <div id="install-tip" hidden><span id="install-tip-text"></span><button class="x" aria-label="Dismiss">&times;</button></div>
@@ -185,5 +197,7 @@
 <script src="places.js"></script>
 <script src="plan.js"></script>
 <script src="offline.js"></script>
+<script src="gpx.js"></script>
+<script src="weather.js"></script>
 </body>
 </html>
