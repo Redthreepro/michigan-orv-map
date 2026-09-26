@@ -1,4 +1,5 @@
-"""Where dispersed camping is allowed: state forest land more than 1 mile from a state forest campground.
+"""Where dispersed camping is allowed: state forest land more than 1 mile from a state forest campground,
+plus national forest land (Huron-Manistee, Hiawatha, Ottawa).
 
 Land ownership changes slowly, so this is run by hand (not nightly):  python build_land.py
 Writes app/data/camping_land.geojson.
@@ -17,6 +18,8 @@ from shapely.geometry import mapping, shape, Point
 
 PARCELS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNRLOTSParcelsOPENDATA/FeatureServer/2"
 SF_CAMPGROUNDS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/ArcGIS/rest/services/dnrParksAndRecreation/FeatureServer/3"
+NF_OWNERSHIP = "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_BasicOwnership_02/MapServer/0"
+MI_FORESTS = ("Huron-Manistee National Forest", "Hiawatha National Forest", "Ottawa National Forest")
 OUT = Path(__file__).parent / "app" / "data" / "camping_land.geojson"
 MILE_DEG_LAT = 1 / 69.0
 
@@ -61,8 +64,21 @@ def main():
     allowed = land.difference(shapely.union_all(circles)).simplify(0.0003, preserve_topology=True)
     parts = list(getattr(allowed, "geoms", [allowed]))
     parts = [p for p in parts if p.area > 2e-6]  # drop specks under ~5 acres
-    feats = [{"type": "Feature", "properties": {"t": "campland"},
+    feats = [{"type": "Feature", "properties": {"t": "campland", "own": "sf"},
               "geometry": json.loads(json.dumps(mapping(p), default=list))} for p in parts]
+
+    # National forest land: dispersed camping allowed almost anywhere unless posted (federal rules, no card)
+    forests = ",".join(f"'{f}'" for f in MI_FORESTS)
+    nf = fetch_all(NF_OWNERSHIP, f"ownerclassification='USDA FOREST SERVICE' AND forestname IN ({forests})",
+                   {"outFields": "forestname", "maxAllowableOffset": "0.0003", "geometryPrecision": "5"})
+    for f in nf:
+        g = shape(f["geometry"]).buffer(0).simplify(0.0003, preserve_topology=True)
+        name = f["properties"]["forestname"].replace(" National Forest", "")
+        for p in getattr(g, "geoms", [g]):
+            if p.area > 2e-6:
+                feats.append({"type": "Feature", "properties": {"t": "campland", "own": "nf", "forest": name},
+                              "geometry": json.loads(json.dumps(mapping(p), default=list))})
+    print(f"national forest land: {sum(1 for x in feats if x['properties']['own'] == 'nf')} polygons")
 
     def rnd(o):
         if isinstance(o, float):

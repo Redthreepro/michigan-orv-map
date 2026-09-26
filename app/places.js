@@ -36,7 +36,7 @@ fetch('data/camping_land.geojson').then((r) => r.json()).then((fc) => {
     const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
     let minx = 180, maxx = -180, miny = 90, maxy = -90;
     for (const poly of polys) for (const [x, y] of poly[0]) { minx = Math.min(minx, x); maxx = Math.max(maxx, x); miny = Math.min(miny, y); maxy = Math.max(maxy, y); }
-    return { bbox: [minx, miny, maxx, maxy], polys };
+    return { bbox: [minx, miny, maxx, maxy], polys, own: f.properties.own || 'sf', forest: f.properties.forest };
   });
   landLayer = L.geoJSON(fc, {
     renderer: landRenderer, interactive: false,
@@ -61,11 +61,18 @@ window.campingAt = (lat, lng) => {
     if (lng < a || lng > c || lat < b || lat > d) continue;
     for (const poly of f.polys) {
       if (inRing(lng, lat, poly[0]) && !poly.slice(1).some((h) => inRing(lng, lat, h))) {
-        return { ok: true, text: 'Free camping allowed: state forest land, more than 1 mile from a state forest campground. Post a camp registration card. Obey any "No Camping" signs.' };
+        if (f.own === 'nf') {
+          const extra = f.forest === 'Huron-Manistee' ? ' Camp at least 200 feet from lakes, rivers and streams.' : ' 16-day stay limit in one spot.';
+          return { ok: true, short: `Free camping allowed here (${f.forest} National Forest). No permit needed.`,
+            text: `Free camping allowed: ${f.forest} National Forest land. No permit or card needed. Not in developed campgrounds or where posted "No Camping".${extra}` };
+        }
+        return { ok: true, short: 'Free camping allowed here (state forest land). Post a camp registration card.',
+          text: 'Free camping allowed: state forest land, more than 1 mile from a state forest campground. Post a camp registration card. Obey any "No Camping" signs.' };
       }
     }
   }
-  return { ok: false, text: 'Not a free camping spot (not state forest land, or within 1 mile of a state forest campground). Use a campground.' };
+  return { ok: false, short: 'Not a free camping spot. Pick a campground or the green-shaded forest land.',
+    text: 'Not a free camping spot (not state or national forest land, or within 1 mile of a state forest campground). Use a campground.' };
 };
 
 // ---------- markers ----------
