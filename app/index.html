@@ -66,6 +66,11 @@
   <label class="row"><input type="checkbox" data-kind="road" checked><i class="sw road"></i>State forest roads <small>zoom in to see</small></label>
   <label class="row"><input type="checkbox" data-kind="scramble" checked><i class="sw scramble"></i>Scramble areas</label>
   <label class="row"><input type="checkbox" data-kind="closed" checked><i class="sw closed"></i>Closures &amp; reroutes</label>
+  <label class="row"><input type="checkbox" data-kind="gas" checked><i class="poi poi-gas sw-poi"></i>Gas stations <small>zoom in to see</small></label>
+  <label class="row"><input type="checkbox" data-kind="camp" checked><i class="poi poi-camp sw-poi"></i>Campgrounds</label>
+  <label class="row"><input type="checkbox" data-kind="land" checked><i class="sw land"></i>Dispersed camping OK <small>state forest land</small></label>
+  <label class="row"><input type="checkbox" data-kind="wp" checked><i class="wp wp-pin sw-poi"></i>My waypoints</label>
+  <button id="btn-wp-list" class="ghost">My waypoints <span id="wp-count"></span></button>
   <h2>My machine</h2>
   <div class="seg" id="rig-seg">
     <button data-rig="0" class="on">Show all</button>
@@ -103,15 +108,39 @@
   <button class="close" aria-label="Close">&times;</button>
   <h2>This spot</h2>
   <p class="hint" id="point-coords"></p>
-  <button id="btn-route-here" class="primary">Route here</button>
-  <button id="btn-route-from" class="ghost">Route from here</button>
+  <p class="hint" id="point-camp" hidden></p>
+  <div class="rec-row"><button id="btn-route-here" class="primary">Route here</button><button id="btn-add-trip" class="ghost">Add to trip</button></div>
+  <div class="rec-row"><button id="btn-route-from" class="ghost">Start trip here</button><button id="btn-save-wp" class="ghost">Save as waypoint</button></div>
 </section>
 
 <!-- route -->
 <section id="panel-route" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
   <div id="route-body"></div>
-  <button id="btn-route-clear" class="ghost">Clear route</button>
+</section>
+
+<!-- waypoint editor -->
+<section id="panel-wp" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <h2>Waypoint</h2>
+  <input id="wp-name" class="field" type="text" placeholder="Name, e.g. Buddy's camp" maxlength="80">
+  <div class="seg" id="wp-type">
+    <button data-type="camp">Camp spot</button>
+    <button data-type="gas">Gas</button>
+    <button data-type="trailhead">Trailhead</button>
+    <button data-type="pin">Other</button>
+  </div>
+  <textarea id="wp-note" class="field" rows="2" placeholder="Note (optional)" maxlength="500"></textarea>
+  <p class="hint" id="wp-camp"></p>
+  <button id="btn-wp-save" class="primary">Save waypoint</button>
+</section>
+
+<!-- waypoint list -->
+<section id="panel-wps" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <h2>My waypoints</h2>
+  <div id="wp-list"></div>
+  <button id="btn-wp-gpx" class="ghost">Share all as GPX</button>
 </section>
 
 <!-- rides -->
@@ -131,5 +160,7 @@
 <script src="app.js"></script>
 <script src="tracks.js"></script>
 <script src="routing.js"></script>
+<script src="places.js"></script>
+<script src="plan.js"></script>
 </body>
 </html>

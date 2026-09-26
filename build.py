@@ -17,6 +17,10 @@ DNR = "https://gisagodnr.state.mi.us/arcgis/rest/services/DNR/DNRTrailsOPENDATA/
 ROADS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_ROADS/FeatureServer/0"
 ROADS_WHERE = ("RoadORVUse IN ('DNR Roads Open to ORVs','DNR Roads Seasonally Closed to ORVs',"
                "'Military Roads Open to ORVs','Military Roads Seasonally Closed to ORVs')")
+PARKS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/ArcGIS/rest/services/dnrParksAndRecreation/FeatureServer"
+OVERPASS = "https://overpass-api.de/api/interpreter"
+OSM_QUERY = ('[out:json][timeout:150];area["ISO3166-2"="US-MI"]->.mi;'
+             '(nwr["amenity"="fuel"](area.mi);nwr["tourism"="camp_site"](area.mi););out center tags;')
 SCRAMBLE = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_ORV_Scramble_Areas/FeatureServer/1"
 
 # layer id -> (type key, name field)
@@ -143,6 +147,50 @@ def build_roads():
     return feats
 
 
+def build_pois():
+    """Gas stations (OpenStreetMap) and campgrounds (DNR state forest + state park, plus OSM for the rest)."""
+    pois = []
+    for layer, sub in ((3, "State forest campground"), (2, "State park campground")):
+        for f in fetch(f"{PARKS}/{layer}", {"outFields": "Name,MainPhone", "maxAllowableOffset": "0"}):
+            x, y = f["geometry"]["coordinates"][:2]
+            p = f["properties"]
+            pois.append({"t": "camp", "n": (p.get("Name") or "").strip(), "sub": sub,
+                         "ph": clean(p.get("MainPhone")), "lat": round(y, 5), "lng": round(x, 5)})
+    dnr = [(p["lat"], p["lng"]) for p in pois]
+
+    try:
+        req = urllib.request.Request(OVERPASS, data=urllib.parse.urlencode({"data": OSM_QUERY}).encode(),
+                                     headers={"User-Agent": "MichiganORVMap/1.0 (github.com/Redthreepro/michigan-orv-map)"})
+        with urllib.request.urlopen(req, timeout=200) as r:
+            osm = json.load(r)["elements"]
+    except Exception as err:  # Overpass is sometimes busy; keep last night's file instead of failing
+        print(f"OpenStreetMap fetch failed ({err}); keeping existing pois.json")
+        return
+    for e in osm:
+        tags = e.get("tags", {})
+        lat = e.get("lat") or e.get("center", {}).get("lat")
+        lng = e.get("lon") or e.get("center", {}).get("lon")
+        if lat is None:
+            continue
+        if tags.get("amenity") == "fuel":
+            name = tags.get("name") or tags.get("brand") or "Gas station"
+            pois.append({"t": "gas", "n": name, "lat": round(lat, 5), "lng": round(lng, 5),
+                         "h": tags.get("opening_hours"), "city": tags.get("addr:city")})
+        else:
+            # skip OSM copies of the DNR campgrounds already listed (within ~300 m)
+            if any(abs(lat - a) < 0.003 and abs(lng - b) < 0.004 for a, b in dnr):
+                continue
+            op = tags.get("operator", "")
+            sub = ("National forest campground" if "Forest Service" in op else
+                   "Backcountry campsite" if tags.get("backcountry") == "yes" else "Campground")
+            pois.append({"t": "camp", "n": tags.get("name") or sub, "sub": sub, "lat": round(lat, 5),
+                         "lng": round(lng, 5), "ph": tags.get("phone"), "fee": tags.get("fee"),
+                         "web": tags.get("website")})
+    pois = [{k: v for k, v in p.items() if v is not None} for p in pois]
+    (OUT / "pois.json").write_text(json.dumps(pois, separators=(",", ":")), encoding="utf-8")
+    print(f"pois          {sum(p['t'] == 'gas' for p in pois)} gas, {sum(p['t'] == 'camp' for p in pois)} campgrounds")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     features = []
@@ -166,6 +214,7 @@ def main():
     print(f"scramble areas     {len(areas):>5}")
 
     road_feats = build_roads()
+    build_pois()
 
     n_edges, n_conn = build_graph(features, road_feats, OUT / "graph.json")
     print(f"routing graph {n_edges} edges ({n_conn} gap connectors), "

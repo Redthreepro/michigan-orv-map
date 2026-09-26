@@ -31,6 +31,11 @@ const view = store.get('view', { c: [44.6, -85.4], z: 7 });
 const map = L.map('map', { zoomControl: false, preferCanvas: true, maxZoom: 18, minZoom: 5 })
   .setView(view.c, view.z);
 const renderer = L.canvas({ tolerance: 14 });
+// fixed stacking: camping land (350) < forest roads (380) < trails (overlay, 400) < planned route (450) < markers
+map.createPane('roads').style.zIndex = 380;
+const roadRenderer = L.canvas({ pane: 'roads', tolerance: 10 });
+map.createPane('plan').style.zIndex = 450;
+const planRenderer = L.canvas({ pane: 'plan' });
 map.attributionControl.setPrefix('');
 
 let baseKey = store.get('base', 'topo');
@@ -41,7 +46,7 @@ function setBase(key) {
   if (baseLayer) map.removeLayer(baseLayer);
   baseLayer = L.tileLayer(BASES[key], {
     maxNativeZoom: 16, maxZoom: 18, crossOrigin: true,
-    attribution: 'USGS The National Map · Trails: Michigan DNR',
+    attribution: 'USGS The National Map · Trails: Michigan DNR · Gas &amp; campgrounds: © OpenStreetMap contributors',
   }).addTo(map);
   baseLayer.bringToBack();
   document.querySelectorAll('#base-seg button').forEach((b) => b.classList.toggle('on', b.dataset.base === key));
@@ -176,7 +181,7 @@ function buildRoadCells(features) {
   }
   for (const feats of buckets.values()) {
     const layer = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
-      renderer, style: styleFor,
+      renderer: roadRenderer, style: styleFor,
       onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l, e.latlng); }),
     });
     roadCells.push({ layer, bounds: layer.getBounds() });
@@ -219,10 +224,13 @@ function showDetail(f, clicked, latlng) {
   if (p.t === 'road' && p.od) html += `<div class="note restrict">DNR ORV dates for this road: opening ${esc(p.od)}, closing ${esc(p.cd || '?')}.</div>`;
   if (p.mil) html += `<div class="note restrict">Camp Grayling military road. May close without notice for training. Check Camp Grayling's Facebook page before riding.</div>`;
   if (p.c) html += `<div class="note">${esc(p.c)}</div>`;
-  html += `<button class="primary" id="btn-detail-route">Route here</button>`;
+  html += `<div class="rec-row"><button class="primary" id="btn-detail-route">Route here</button><button class="ghost" id="btn-detail-trip">Add to trip</button></div>`;
+  $('#sheet-body').onclick = null;
   $('#sheet-body').innerHTML = html;
   const target = latlng || (clicked.getCenter ? clicked.getCenter() : clicked.getBounds().getCenter());
-  $('#btn-detail-route').addEventListener('click', () => window.routeHere && window.routeHere(target));
+  const label = p.n || KIND[p.t].label;
+  $('#btn-detail-route').addEventListener('click', () => window.routeHere && window.routeHere(target, label));
+  $('#btn-detail-trip').addEventListener('click', () => window.addToTrip && window.addToTrip(target, label));
   openSheet('#sheet');
   highlightName(p, clicked);
 }
@@ -340,6 +348,7 @@ function onPos(pos) {
   if (speed != null && speed > 0.5) bits.push(`${Math.round(speed * 2.237)} mph`);
   $('#scale-info').textContent = bits.join(' · ');
   if (window.onTrackPos) window.onTrackPos(pos);
+  if (window.onPlanPos) window.onPlanPos(pos);
 }
 function onPosErr(err) {
   toast(err.code === 1 ? 'Location permission denied — allow it in your browser settings.' : 'No GPS fix yet…');

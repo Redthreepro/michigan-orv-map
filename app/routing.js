@@ -12,10 +12,6 @@ const FLAG = { closed: 1, seasonal: 2, military: 4, connector: 8 };
 
 let G = null;          // loaded graph
 let loading = null;
-let route = null;      // { from, to, result }
-let routeLayer = null;
-let fromMarker = null;
-let manualStart = null;
 
 // ---------- geometry ----------
 function hav(lat1, lng1, lat2, lng2) {
@@ -282,50 +278,8 @@ function assemble(S, T, sol, reachedNode) {
   return legs;
 }
 
-// ---------- public ----------
-async function routeTo(to) {
-  let from = manualStart;
-  if (!from) {
-    if (!meMarker) {
-      ensureGpsFix();
-      toast('Getting your GPS location… or long-press the map and pick "Route from here".');
-      from = await waitForFix(20000);
-      if (!from) return toast('No GPS fix. Long-press a start point and choose "Route from here".');
-    } else from = meMarker.getLatLng();
-  }
-  try { await loadGraph(); } catch { return toast('Could not load the trail network'); }
-  route = { from: L.latLng(from), to: L.latLng(to) };
-  runRoute();
-}
 
-function runRoute() {
-  if (!route) return;
-  let { S, T, alts } = snapPair(route.from, route.to);
-  if (!S) return toast('No trail you can ride within 15 miles of the start.');
-  if (!T) return toast('No trail you can ride within 15 miles of that spot.');
-  let sol = solve(S, T);
-  if (!sol.endVia && alts) {
-    // score = off-network to reach the start + straight-line gap left at the end
-    let best = { S, sol, score: S.d + (sol.closestD ?? Infinity) };
-    for (const a of alts) {
-      const s2 = solve(a, T);
-      const score = a.d + (s2.endVia ? 0 : s2.closestD);
-      if (score < best.score) best = { S: a, sol: s2, score };
-    }
-    S = best.S; sol = best.sol;
-  }
-  let legs, gap = null;
-  if (sol.endVia) legs = assemble(S, T, sol);
-  else {
-    legs = sol.closest != null ? assemble(S, T, sol, sol.closest) : [];
-    const last = legs.length ? legs[legs.length - 1].coords.slice(-1)[0] : [S.lat, S.lng];
-    gap = { from: last, to: [T.lat, T.lng], meters: hav(last[0], last[1], T.lat, T.lng) };
-  }
-  route.result = summarize(legs, S, T, gap);
-  drawRoute();
-  showRouteSheet();
-}
-
+// ---------- per-leg summary ----------
 function summarize(legs, S, T, gap) {
   let meters = 0, secs = 0;
   const byKind = {}, steps = [];
@@ -358,95 +312,3 @@ function summarize(legs, S, T, gap) {
     offStart: S.d, offEnd: T.d, startPt: [S.lat, S.lng], endPt: [T.lat, T.lng],
   };
 }
-
-function drawRoute() {
-  clearRouteLayer();
-  const r = route.result;
-  const lines = r.legs.map((l) => l.coords);
-  routeLayer = L.layerGroup().addTo(map);
-  L.polyline(lines, { renderer, color: '#fff', weight: 11, opacity: 0.9, interactive: false }).addTo(routeLayer);
-  L.polyline(lines, { renderer, color: '#1e6bff', weight: 6, opacity: 1, interactive: false }).addTo(routeLayer);
-  const dash = { renderer, color: '#1e6bff', weight: 3, dashArray: '2 8', interactive: false };
-  if (r.offStart > 30) L.polyline([route.from, r.startPt], dash).addTo(routeLayer);
-  if (r.offEnd > 30) L.polyline([r.endPt, route.to], dash).addTo(routeLayer);
-  if (r.gap) L.polyline([r.gap.from, r.gap.to], { ...dash, color: '#ff2d2d', weight: 4, dashArray: '6 8' }).addTo(routeLayer);
-  L.circleMarker(route.from, { renderer, radius: 8, color: '#fff', weight: 3, fillColor: '#2fbf4a', fillOpacity: 1, interactive: false }).addTo(routeLayer);
-  L.circleMarker(route.to, { renderer, radius: 8, color: '#fff', weight: 3, fillColor: '#ff2d2d', fillOpacity: 1, interactive: false }).addTo(routeLayer);
-  const all = [route.from, route.to, ...lines.flat()];
-  map.fitBounds(L.latLngBounds(all), { padding: [60, 60], maxZoom: 15 });
-}
-function clearRouteLayer() { if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; } }
-
-const fmtMi = (m) => (m / 1609.344).toFixed(m < 16093 ? 1 : 0) + ' mi';
-const fmtTime = (s) => { const m = Math.round(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
-
-function showRouteSheet() {
-  const r = route.result;
-  const bar = $('#route-bar');
-  bar.hidden = false;
-  bar.querySelector('span').textContent = r.gap ? `${fmtMi(r.meters)} · doesn't connect` : `${fmtMi(r.meters)} · ~${fmtTime(r.secs)}`;
-  const kinds = Object.entries(r.byKind).filter(([k]) => k !== 'connector').sort((a, b) => b[1] - a[1])
-    .map(([k, m]) => `${fmtMi(m)} ${KIND[k].label.toLowerCase()}`).join(', ');
-  let html = `<h3>${r.gap ? 'Partial route' : 'Route'}: ${fmtMi(r.meters)}</h3>
-    <p class="hint">About ${fmtTime(r.secs)} of riding${kinds ? ' · ' + esc(kinds) : ''}${rig ? ` · for machines up to ${rig}"` : ''}</p>`;
-  if (r.gap) html += `<div class="note">The trail network doesn't connect all the way. The last <b>${fmtMi(r.gap.meters)}</b> (red dashes, straight line) has no DNR route, trail, or forest road you can ride. Trail systems are often linked by county roads. Check that county's ORV ordinance before riding them.</div>`;
-  if (r.offStart > 400) html += `<div class="note">Your start is ${fmtMi(r.offStart)} from the nearest trail you can ride. The route starts there.</div>`;
-  if (r.offEnd > 400) html += `<div class="note">That spot is ${fmtMi(r.offEnd)} from the nearest trail you can ride. The route ends there.</div>`;
-  if (r.seasonal > 50) html += `<div class="note restrict">Uses ${fmtMi(r.seasonal)} of forest road that is closed to ORVs part of the year. Tap the dashed teal roads to see the dates.</div>`;
-  if (r.military > 50) html += `<div class="note restrict">Crosses Camp Grayling military roads, which can close for training.</div>`;
-  html += '<ol class="steps">' + r.steps.map((s, i) => `<li data-i="${i}"><b>${esc(s.label)}</b><small>${fmtMi(s.meters)}</small></li>`).join('') + '</ol>';
-  html += `<p class="hint">Routes use DNR data only and skip closed segments. Always follow posted signs.</p>`;
-  $('#route-body').innerHTML = html;
-  $('#route-body').querySelectorAll('.steps li').forEach((li) => li.addEventListener('click', () => {
-    map.setView(r.steps[+li.dataset.i].at, Math.max(map.getZoom(), 14));
-  }));
-  openSheet('#panel-route');
-}
-
-function clearRoute() {
-  route = null; manualStart = null;
-  clearRouteLayer();
-  if (fromMarker) { map.removeLayer(fromMarker); fromMarker = null; }
-  $('#route-bar').hidden = true;
-  closeSheets();
-}
-$('#btn-route-clear').addEventListener('click', clearRoute);
-$('#route-bar').addEventListener('click', (e) => {
-  if (e.target.closest('.x')) return clearRoute();
-  if (route && route.result) showRouteSheet();
-});
-
-// Re-run with the same ends when the machine width changes.
-document.querySelectorAll('#rig-seg button').forEach((b) => b.addEventListener('click', () => { if (route && G) runRoute(); }));
-
-// ---------- GPS helpers ----------
-function ensureGpsFix() { if (watchId === null) locBtn.click(); }
-function waitForFix(ms) {
-  return new Promise((resolve) => {
-    const t0 = Date.now();
-    const iv = setInterval(() => {
-      if (meMarker) { clearInterval(iv); resolve(meMarker.getLatLng()); }
-      else if (Date.now() - t0 > ms) { clearInterval(iv); resolve(null); }
-    }, 300);
-  });
-}
-
-// ---------- entry points ----------
-// long-press (or right-click) anywhere
-let pressed = null;
-map.on('contextmenu', (e) => {
-  pressed = e.latlng;
-  $('#point-coords').textContent = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
-  openSheet('#panel-point');
-});
-$('#btn-route-here').addEventListener('click', () => { closeSheets(); routeTo(pressed); });
-$('#btn-route-from').addEventListener('click', () => {
-  manualStart = pressed;
-  if (fromMarker) map.removeLayer(fromMarker);
-  fromMarker = L.circleMarker(pressed, { renderer, radius: 8, color: '#fff', weight: 3, fillColor: '#2fbf4a', fillOpacity: 1, interactive: false }).addTo(map);
-  closeSheets();
-  if (route) { route.from = L.latLng(pressed); runRoute(); }
-  else toast('Start set. Now long-press where you want to go and choose "Route here".');
-});
-// "Route here" from a trail's detail sheet
-window.routeHere = (latlng) => { closeSheets(); routeTo(latlng); };

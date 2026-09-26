@@ -14,6 +14,13 @@ roads open to ORVs (shown from zoom 10 in).
 - **Tap-to-route**: long-press the map (or "Route here" on any trail) for the best legal path for your
   machine over routes, trails, and forest roads — computed on the phone, works offline. Where the DNR
   network doesn't connect, it routes as close as it can and shows the gap.
+- **Trips**: add stops (long-press, or any trail/gas/campground/waypoint → "Add to trip"), mark overnight
+  stops to split the ride into days, see gas and campgrounds within 2 mi of the route and the longest
+  stretch with no gas. Share the trip as GPX. Auto-reroutes if you leave the route with GPS on.
+- **Gas & campgrounds**: OpenStreetMap gas stations; DNR state forest + state park campgrounds plus OSM.
+- **Dispersed camping**: green-shaded state forest land more than 1 mile from a state forest campground
+  (DNR rule). Long-press any spot to check it. Rebuild with `python build_land.py` (not nightly).
+- **Waypoints**: save your own spots, route to them, add them to trips, share as GPX.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

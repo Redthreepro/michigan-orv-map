@@ -7,16 +7,20 @@ const MAX_ACC_M = 40;       // ignore fixes worse than this
 
 // ---------- storage ----------
 const db = new Promise((resolve, reject) => {
-  const req = indexedDB.open('orv', 1);
-  req.onupgradeneeded = () => req.result.createObjectStore('tracks', { keyPath: 'id' });
+  const req = indexedDB.open('orv', 2);
+  req.onupgradeneeded = () => {
+    for (const name of ['tracks', 'waypoints']) {
+      if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name, { keyPath: 'id' });
+    }
+  };
   req.onsuccess = () => resolve(req.result);
   req.onerror = () => reject(req.error);
 });
-async function tx(mode, fn) {
+async function tx(mode, fn, store = 'tracks') {
   const d = await db;
   return new Promise((resolve, reject) => {
-    const t = d.transaction('tracks', mode);
-    const r = fn(t.objectStore('tracks'));
+    const t = d.transaction(store, mode);
+    const r = fn(t.objectStore(store));
     t.oncomplete = () => resolve(r && r.result);
     t.onerror = () => reject(t.error);
   });
@@ -235,12 +239,13 @@ function gpx(t) {
 ${segs}
 </trk></gpx>`;
 }
-async function exportGpx(t) {
-  const name = t.name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') + '.gpx';
-  const file = new File([gpx(t)], name, { type: 'application/gpx+xml' });
+async function exportGpx(t) { return shareGpx(t.name, gpx(t)); }
+async function shareGpx(title, xml) {
+  const name = title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') + '.gpx';
+  const file = new File([xml], name, { type: 'application/gpx+xml' });
   // Phones: open the share sheet (Drive, email, text, other map apps). Desktop: plain download.
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: t.name }); return; } catch (err) { if (err.name === 'AbortError') return; }
+    try { await navigator.share({ files: [file], title }); return; } catch (err) { if (err.name === 'AbortError') return; }
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(file); a.download = name;

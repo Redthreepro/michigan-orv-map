@@ -1,12 +1,12 @@
 // Bump SHELL when app files change so phones pick up the new version.
-const SHELL = 'orv-shell-v6';
+const SHELL = 'orv-shell-v7';
 const DATA = 'orv-data';
 const TILES = 'orv-tiles';
 const SHELL_FILES = [
-  './', 'index.html', 'app.js', 'tracks.js', 'routing.js', 'style.css', 'manifest.webmanifest',
+  './', 'index.html', 'app.js', 'tracks.js', 'routing.js', 'places.js', 'plan.js', 'style.css', 'manifest.webmanifest',
   'vendor/leaflet.js', 'vendor/leaflet.css', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
-const DATA_FILES = ['data/trails.geojson', 'data/roads.geojson', 'data/graph.json', 'data/meta.json'];
+const DATA_FILES = ['data/trails.geojson', 'data/roads.geojson', 'data/graph.json', 'data/pois.json', 'data/camping_land.geojson', 'data/meta.json'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
