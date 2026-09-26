@@ -24,6 +24,12 @@ roads open to ORVs (shown from zoom 10 in).
 - **Offline panel** (download button): a ready-for-no-signal checklist (home-screen app vs browser tab,
   app files saved, closure data age, storage protected, location allowed, trip map saved) plus
   one-tap "Download trip map" for a 1-mile corridor along the planned trip (3 mi around camps/ends).
+- **ORV trailheads & parking** (DNR): where it is, surface, directions, and which routes/trails it
+  connects to for your machine width. "Start a trip from here". Searchable by name.
+- **Trip warnings** ("Heads up" box): gaps, closures/reroutes on or near the route (grouped), long no-gas
+  stretches, overnight stops that aren't legal camping, long days, seasonal/military roads, nearest ORV
+  parking if you don't start at one, stale closure data. Roads/trails lying along a closure are also
+  closed for routing.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

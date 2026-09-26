@@ -13,11 +13,13 @@ from collections import defaultdict
 
 import numpy as np
 import shapely
+import shapely.prepared
 from shapely.geometry import LineString, Point
 from shapely.ops import substring
 
 SNAP_DEG = 0.0004        # ~30-45 m: close gaps where a trail stops just short of another line
 SCALE = 100000           # 1e-5 deg ~ 1 m
+CLOSURE_BUFFER_DEG = 0.00015  # ~12-15 m either side of a closure line
 
 
 def meters(line):
@@ -110,12 +112,30 @@ def build_graph(trail_features, road_features, out_path):
             flat += [x1 - x0, y1 - y0]
         edges.append([a, round(meters(line), 1), flat])
 
+    # A temporary closure blocks the ground, not just the DNR line: close any road or trail piece that
+    # mostly lies along a closure (e.g. a forest road under a closed ORV route).
+    closure_zone = None
+    closure_lines = [LineString(c) for f in trail_features if f["properties"]["t"] == "closure"
+                     for c in ([f["geometry"]["coordinates"]] if f["geometry"]["type"] == "LineString"
+                               else f["geometry"]["coordinates"]) if len(c) >= 2]
+    if closure_lines:
+        closure_zone = shapely.prepared.prep(shapely.union_all(closure_lines).buffer(CLOSURE_BUFFER_DEG))
+        zone_geom = shapely.union_all(closure_lines).buffer(CLOSURE_BUFFER_DEG)
+
+    closed_extra = 0
     for i, (g, a) in enumerate(lines):
         stops = sorted(d for d in cuts[i] if 0 < d < g.length)
         bounds = [0.0] + stops + [g.length]
         for s, e in zip(bounds, bounds[1:]):
             if e - s > 1e-9:
-                emit(substring(g, s, e), a)
+                piece = substring(g, s, e)
+                use = a
+                if closure_zone is not None and not attrs[a][3] & 1 and closure_zone.intersects(piece)                         and piece.length > 0 and piece.intersection(zone_geom).length / piece.length > 0.6:
+                    kind, lim, name, flags = attrs[a]
+                    use = attr_id((kind, lim, name, flags | 1))
+                    closed_extra += 1
+                emit(piece, use)
+    print(f"  graph: {closed_extra} road/trail pieces closed because they run along a temporary closure")
     for c in connectors:
         emit(c, conn_attr)
 

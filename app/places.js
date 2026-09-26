@@ -7,9 +7,9 @@ let landLayer = null;
 let waypoints = [];
 const poiLayer = L.layerGroup().addTo(map);
 const wpLayer = L.layerGroup().addTo(map);
-const POI_MIN_ZOOM = { gas: 11, camp: 9 };
+const POI_MIN_ZOOM = { gas: 11, camp: 9, th: 7 };
 const MAX_MARKERS = 400;
-for (const k of ['gas', 'camp', 'land', 'wp']) if (shown[k] === undefined) shown[k] = 1;
+for (const k of ['gas', 'camp', 'land', 'wp', 'th']) if (shown[k] === undefined) shown[k] = 1;
 
 // camping land sits under everything else
 map.createPane('land').style.zIndex = 350;
@@ -19,6 +19,7 @@ const GLYPH = {
   gas: '<svg viewBox="0 0 24 24"><path d="M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M4 20h11M7 8h5M14 10h2a1 1 0 0 1 1 1v5a1.5 1.5 0 0 0 3 0V8l-3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   camp: '<svg viewBox="0 0 24 24"><path d="M3 20 12 5l9 15M12 20l-3-5M12 20l3-5M2 20h20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   trailhead: '<svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-3 4 3 4H6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  th: '<svg viewBox="0 0 24 24"><path d="M8 20V4h5.5a4.5 4.5 0 0 1 0 9H8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   pin: '<svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="3" fill="currentColor"/></svg>',
 };
 const WP_TYPES = { camp: 'Camp spot', gas: 'Gas', trailhead: 'Trailhead', pin: 'Other' };
@@ -82,6 +83,7 @@ function updatePois() {
   let n = 0;
   for (const p of POIS) {
     if (!shown[p.t] || z < POI_MIN_ZOOM[p.t] || !view.contains([p.lat, p.lng])) continue;
+    if (p.t === 'th' && rig && p.lim && p.lim < rig) continue;
     L.marker([p.lat, p.lng], { icon: poiIcon(p.t) }).on('click', (e) => { L.DomEvent.stop(e); showPlace(p); }).addTo(poiLayer);
     if (++n >= MAX_MARKERS) break;
   }
@@ -91,6 +93,7 @@ map.on('zoomend', applyPlaces);
 
 // ---------- place sheet (gas / campground / waypoint) ----------
 function showPlace(p, wp) {
+  if (!wp && p.t === 'th') return showTrailhead(p);
   const kind = wp ? WP_TYPES[wp.type] || 'Waypoint' : p.t === 'gas' ? 'Gas station' : p.sub || 'Campground';
   const rows = wp ? [['Note', wp.note]] : [
     ['City', p.city], ['Hours', p.h], ['Phone', p.ph], ['Fee', p.fee === 'yes' ? 'Yes' : p.fee === 'no' ? 'Free' : p.fee],
@@ -120,6 +123,45 @@ function showPlace(p, wp) {
   openSheet('#sheet');
 }
 window.showPlace = showPlace;
+
+// ---------- trailheads / ORV parking ----------
+const limLabel = (lim) => (lim === 24 ? 'motorcycles only' : lim ? `up to ${lim}"` : '');
+function showTrailhead(p) {
+  let html = `<h3>${esc(p.n)}</h3><span class="tag kind">${esc(p.sub === 'Trailhead' ? 'ORV trailhead' : 'ORV parking')}</span>`;
+  const rows = [['Where', p.note], ['Surface', p.sf]].filter(([, v]) => v);
+  if (rows.length) html += '<dl>' + rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>';
+  if (p.near && p.near.length) {
+    html += '<h2>Connects to</h2><ul class="along">' + p.near.map(([n, lim, d]) => {
+      const no = rig && lim < rig;
+      return `<li class="${no ? 'muted' : ''}"><b>${esc(n)}</b><small>${esc(limLabel(lim))} · ${d < 160 ? 'right here' : fmtMi(d) + ' away'}${no ? ' · too narrow for your machine' : ''}</small></li>`;
+    }).join('') + '</ul>';
+  } else html += '<p class="hint warn">No DNR route or trail within about half a mile.</p>';
+  html += '<p class="hint">DNR data doesn\'t list lot size. Check that it fits your trailer before you commit.</p>';
+  html += `<button class="primary" data-a="start">Start a trip from here</button>
+    <div class="rec-row"><button class="ghost" data-a="route">Route here</button><button class="ghost" data-a="trip">Add to trip</button></div>
+    <button class="ghost" data-a="save">Save as waypoint</button>`;
+  $('#sheet-body').innerHTML = html;
+  $('#sheet-body').onclick = (e) => {
+    const a = e.target.closest('button')?.dataset.a;
+    const ll = L.latLng(p.lat, p.lng);
+    if (a === 'start') startHere(ll, p.n);
+    if (a === 'route') routeHere(ll, p.n);
+    if (a === 'trip') addToTrip(ll, p.n);
+    if (a === 'save') editWaypoint({ lat: p.lat, lng: p.lng, name: p.n, type: 'trailhead' });
+  };
+  openSheet('#sheet');
+}
+
+// nearest ORV parking to a point that serves your machine (for trip checks)
+window.nearestTrailhead = (lat, lng) => {
+  let best = null;
+  for (const p of window.POIS || []) {
+    if (p.t !== 'th' || (rig && p.lim && p.lim < rig)) continue;
+    const d = hav(lat, lng, p.lat, p.lng);
+    if (!best || d < best.d) best = { p, d };
+  }
+  return best;
+};
 
 // ---------- waypoints ----------
 let editing = null;
@@ -186,8 +228,10 @@ $('#btn-wp-gpx').addEventListener('click', () => {
 });
 
 // layer toggles for the new kinds
-document.querySelectorAll('[data-kind="gas"],[data-kind="camp"],[data-kind="land"],[data-kind="wp"]').forEach((cb) => {
+document.querySelectorAll('[data-kind="gas"],[data-kind="camp"],[data-kind="land"],[data-kind="wp"],[data-kind="th"]').forEach((cb) => {
   cb.checked = !!shown[cb.dataset.kind];
   cb.addEventListener('change', applyPlaces);
 });
 applyPlaces();
+
+document.querySelectorAll('#rig-seg button').forEach((b) => b.addEventListener('click', updatePois));

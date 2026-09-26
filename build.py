@@ -18,6 +18,8 @@ ROADS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_
 ROADS_WHERE = ("RoadORVUse IN ('DNR Roads Open to ORVs','DNR Roads Seasonally Closed to ORVs',"
                "'Military Roads Open to ORVs','Military Roads Seasonally Closed to ORVs')")
 PARKS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/ArcGIS/rest/services/dnrParksAndRecreation/FeatureServer"
+ASSETS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNRReferenceAssetsOPENDATA/FeatureServer"
+ORV_WHERE = "DESCRIP LIKE '%ORV%' OR COMMENTS LIKE '%ORV%'"
 OVERPASS = "https://overpass-api.de/api/interpreter"
 OSM_QUERY = ('[out:json][timeout:150];area["ISO3166-2"="US-MI"]->.mi;'
              '(nwr["amenity"="fuel"](area.mi);nwr["tourism"="camp_site"](area.mi););out center tags;')
@@ -147,9 +149,70 @@ def build_roads():
     return feats
 
 
-def build_pois():
+def orv_part(text):
+    """'Snowmobile Trail LP 35 / ORV Lincoln Hills / ORV Little Manistee' -> 'ORV Lincoln Hills / ORV Little Manistee'."""
+    parts = [p.strip(" .") for p in re.split(r"\s*/\s*|\s*\.\s+", text or "") if p.strip(" .")]
+    orv = [p for p in parts if "ORV" in p or "Trail" in p and "Snowmobile" not in p]
+    return " / ".join(orv or parts)
+
+
+def trailhead_note(comments):
+    c = (comments or "").strip()
+    if not c or c.lower() == "null" or c.startswith("Source:"):
+        return None
+    # drop the leading "Snowmobile Parking / ORV Parking" labels, keep the directions
+    c = re.sub(r"^(?:[A-Za-z ]+ Parking\s*/?\s*)+", "", c).strip(" ./")
+    if re.fullmatch(r"(?:ORV|Snowmobile|Trail)(?:[\s,/&]+(?:ORV|Snowmobile|Trail))*", c, re.I):
+        return None  # just a list of uses
+    return c or None
+
+
+def build_trailheads(trail_features):
+    """DNR ORV trailheads and ORV parking lots, each tagged with the rideable trails within ~1 km."""
+    from shapely.geometry import Point, shape
+    import shapely
+
+    lines, info = [], []
+    for f in trail_features:
+        p = f["properties"]
+        if p["t"] in ("route", "trail", "mc", "mccct") and f.get("geometry"):
+            lines.append(shape(f["geometry"]))
+            info.append((p.get("n") or "", p.get("lim") or 0))
+    tree = shapely.STRtree(lines)
+
+    out = []
+    for layer, kind in ((10, "Trailhead"), (6, "ORV parking")):
+        for f in fetch(f"{ASSETS}/{layer}", {"where": ORV_WHERE, "maxAllowableOffset": "0",
+                                             "outFields": "ASSETDETAILTYPE,DESCRIP,SURFMATERIAL,COMMENTS"}):
+            if not f.get("geometry"):
+                continue
+            x, y = f["geometry"]["coordinates"][:2]
+            if any(abs(o["lat"] - y) < 0.001 and abs(o["lng"] - x) < 0.0013 for o in out):
+                continue  # same lot listed twice
+            p = f["properties"]
+            pt = Point(x, y)
+            near = {}
+            for i in tree.query(pt, predicate="dwithin", distance=0.012):
+                name, lim = info[i]
+                d = round(lines[i].distance(pt) * 111000)
+                if name and (name not in near or d < near[name][1]):
+                    near[name] = (lim, d)
+            # "LP 35" / "UP 431" are snowmobile trail numbers riding along an ORV route; not useful here
+            nearby = sorted(([n, lim, d] for n, (lim, d) in near.items() if not re.fullmatch(r"[LU]P \d+", n)),
+                            key=lambda r: r[2])[:5]
+            name = re.sub(r"\s+", " ", orv_part(p.get("DESCRIP")) or kind)
+            if re.search(r"Sn\w*mobile", name) and "ORV" not in name and nearby:
+                name = f"ORV parking · {nearby[0][0]}"
+            out.append({"t": "th", "n": name, "sub": kind,
+                        "note": trailhead_note(p.get("COMMENTS")), "sf": clean(p.get("SURFMATERIAL")),
+                        "near": nearby, "lim": max((r[1] for r in nearby), default=0),
+                        "lat": round(y, 5), "lng": round(x, 5)})
+    return [{k: v for k, v in o.items() if v not in (None, "Unspecified")} for o in out]
+
+
+def build_pois(trail_features):
     """Gas stations (OpenStreetMap) and campgrounds (DNR state forest + state park, plus OSM for the rest)."""
-    pois = []
+    pois = build_trailheads(trail_features)
     for layer, sub in ((3, "State forest campground"), (2, "State park campground")):
         for f in fetch(f"{PARKS}/{layer}", {"outFields": "Name,MainPhone", "maxAllowableOffset": "0"}):
             x, y = f["geometry"]["coordinates"][:2]
@@ -158,14 +221,21 @@ def build_pois():
                          "ph": clean(p.get("MainPhone")), "lat": round(y, 5), "lng": round(x, 5)})
     dnr = [(p["lat"], p["lng"]) for p in pois]
 
+    dnr_subs = ("State forest campground", "State park campground")
     try:
         req = urllib.request.Request(OVERPASS, data=urllib.parse.urlencode({"data": OSM_QUERY}).encode(),
                                      headers={"User-Agent": "MichiganORVMap/1.0 (github.com/Redthreepro/michigan-orv-map)"})
         with urllib.request.urlopen(req, timeout=200) as r:
             osm = json.load(r)["elements"]
-    except Exception as err:  # Overpass is sometimes busy; keep last night's file instead of failing
-        print(f"OpenStreetMap fetch failed ({err}); keeping existing pois.json")
-        return
+    except Exception as err:
+        # Overpass is sometimes busy: reuse last run's OpenStreetMap gas/campgrounds, keep the fresh DNR data
+        print(f"OpenStreetMap fetch failed ({err}); reusing previous gas stations and OSM campgrounds")
+        osm = []
+        try:
+            old = json.loads((OUT / "pois.json").read_text(encoding="utf-8"))
+            pois += [p for p in old if p["t"] == "gas" or (p["t"] == "camp" and p.get("sub") not in dnr_subs)]
+        except FileNotFoundError:
+            pass
     for e in osm:
         tags = e.get("tags", {})
         lat = e.get("lat") or e.get("center", {}).get("lat")
@@ -188,7 +258,8 @@ def build_pois():
                          "web": tags.get("website")})
     pois = [{k: v for k, v in p.items() if v is not None} for p in pois]
     (OUT / "pois.json").write_text(json.dumps(pois, separators=(",", ":")), encoding="utf-8")
-    print(f"pois          {sum(p['t'] == 'gas' for p in pois)} gas, {sum(p['t'] == 'camp' for p in pois)} campgrounds")
+    print(f"pois          {sum(p['t'] == 'gas' for p in pois)} gas, {sum(p['t'] == 'camp' for p in pois)} campgrounds, "
+          f"{sum(p['t'] == 'th' for p in pois)} ORV trailheads/parking")
 
 
 def main():
@@ -214,7 +285,7 @@ def main():
     print(f"scramble areas     {len(areas):>5}")
 
     road_feats = build_roads()
-    build_pois()
+    build_pois(features)
 
     n_edges, n_conn = build_graph(features, road_feats, OUT / "graph.json")
     print(f"routing graph {n_edges} edges ({n_conn} gap connectors), "

@@ -297,12 +297,16 @@ search.addEventListener('input', () => {
   const q = search.value.trim().toLowerCase();
   if (q.length < 2) { results.hidden = true; return; }
   const hits = [...nameIndex.values()].filter((e) => e.n.toLowerCase().includes(q)).slice(0, 25);
+  for (const p of window.POIS || []) {
+    if (p.t === 'th' && p.n.toLowerCase().includes(q) && hits.length < 30) hits.push({ n: p.n, kind: 'th', poi: p });
+  }
   results.innerHTML = hits.length
-    ? hits.map((e, i) => `<li data-i="${i}">${esc(e.n)}<small>${KIND[e.kind].label}${e.co ? ' · ' + esc(e.co) + ' County' : ''}</small></li>`).join('')
+    ? hits.map((e, i) => `<li data-i="${i}">${esc(e.n)}<small>${e.poi ? 'ORV trailhead / parking' : KIND[e.kind].label}${e.co ? ' · ' + esc(e.co) + ' County' : ''}</small></li>`).join('')
     : '<li>No matches</li>';
   results.hidden = false;
   results.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
     const e = hits[+li.dataset.i];
+    if (e.poi) { results.hidden = true; search.blur(); map.setView([e.poi.lat, e.poi.lng], 14); return showPlace(e.poi); }
     map.fitBounds(e.b, { padding: [40, 40], maxZoom: 15 });
     results.hidden = true; search.blur();
     let first = null;
