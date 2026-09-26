@@ -29,7 +29,7 @@ jobs:
       - name: Commit data if trails changed
         if: github.event_name != 'push'
         run: |
-          if git diff --quiet -- app/data/trails.geojson app/data/roads.geojson app/data/graph.json; then
+          if git diff --quiet -- app/data/trails.geojson app/data/roads.geojson app/data/graph.json app/data/pois.json; then
             # still deploys the fresh meta.json so the app shows when it was last checked
             echo "No trail changes"
           else
