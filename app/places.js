@@ -1,5 +1,5 @@
 'use strict';
-// Gas stations, campgrounds, dispersed-camping land, and your own saved waypoints.
+// Gas stations, campgrounds, free (dispersed) camping land, and your own saved waypoints.
 
 window.POIS = null;
 let LAND = null;               // [{ bbox, rings }] for point-in-polygon checks
@@ -58,11 +58,11 @@ window.campingAt = (lat, lng) => {
     if (lng < a || lng > c || lat < b || lat > d) continue;
     for (const poly of f.polys) {
       if (inRing(lng, lat, poly[0]) && !poly.slice(1).some((h) => inRing(lng, lat, h))) {
-        return { ok: true, text: 'Dispersed camping allowed: state forest land, more than 1 mile from a state forest campground. Free, but post a camp registration card. Obey any "No Camping" signs.' };
+        return { ok: true, text: 'Free camping allowed: state forest land, more than 1 mile from a state forest campground. Post a camp registration card. Obey any "No Camping" signs.' };
       }
     }
   }
-  return { ok: false, text: 'Not a dispersed camping spot (not state forest land, or within 1 mile of a state forest campground). Use a campground.' };
+  return { ok: false, text: 'Not a free camping spot (not state forest land, or within 1 mile of a state forest campground). Use a campground.' };
 };
 
 // ---------- markers ----------

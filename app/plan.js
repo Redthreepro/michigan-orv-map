@@ -173,7 +173,7 @@ function showPlan() {
       if (cg) camp = `<small class="ok">Campground: ${esc(cg.sub || 'campground')}${cg.ph ? ' · ' + esc(cg.ph) : ''}</small>`;
       else {
         const c = campingAt(s.lat, s.lng);
-        camp = `<small class="${c.ok ? 'ok' : 'warn'}">${esc(c.ok ? 'Dispersed camping allowed here (state forest land). Post a camp registration card.' : 'Not a legal dispersed camping spot. Pick a campground or the green-shaded state forest land.')}</small>`;
+        camp = `<small class="${c.ok ? 'ok' : 'warn'}">${esc(c.ok ? 'Free camping allowed here (state forest land). Post a camp registration card.' : 'Not a free camping spot. Pick a campground or the green-shaded state forest land.')}</small>`;
       }
     }
     html += `<li class="stop" data-i="${i}">
