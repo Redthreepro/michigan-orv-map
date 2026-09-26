@@ -38,6 +38,13 @@ roads open to ORVs (shown from zoom 10 in).
 - **Difficulty flags**: DNR "High clearance" / "4x4 + high clearance" tags on trails and trip warnings;
   MDOT seasonal connectors count as seasonal.
 - **Weather**: National Weather Service forecast for trip start, camps, and end; saved for offline.
+- **National forest roads & trails** (USFS Motor Vehicle Use Map: Huron-Manistee, Hiawatha, Ottawa) with
+  each road's ORV classes and open dates; routing skips ones closed today.
+- **Free camping** also covers national forest land (no permit; forest-specific rules shown).
+- **Search** towns, trails, trailheads, campgrounds, and gas ("shell gray" → Shell · Grayling).
+- **Fuel range** setting drives the no-gas warnings on trips.
+- **First-open welcome** (machine, fuel range, how to use it; reopen via Layers → How to use this map)
+  and an "App updated, tap to reload" banner.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

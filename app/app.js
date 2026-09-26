@@ -433,7 +433,20 @@ function toast(msg) {
 function netState() { $('#net').hidden = navigator.onLine; }
 addEventListener('online', netState); addEventListener('offline', netState); netState();
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+// When a new version finishes downloading in the background, offer a one-tap reload.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', () => {
+        // only when replacing an older version, not on the very first install
+        if (nw.state === 'activated' && navigator.serviceWorker.controller) $('#update-bar').hidden = false;
+      });
+    });
+  }).catch(() => {});
+}
+$('#update-bar').addEventListener('click', () => location.reload());
 
 loadTrails().catch(() => toast('Could not load trail data'));
 

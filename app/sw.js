@@ -1,5 +1,5 @@
 // Bump SHELL when app files change so phones pick up the new version.
-const SHELL = 'orv-shell-v14';
+const SHELL = 'orv-shell-v17';
 const DATA = 'orv-data';
 const TILES = 'orv-tiles';
 const SHELL_FILES = [

@@ -7,7 +7,7 @@ let landLayer = null;
 let waypoints = [];
 const poiLayer = L.layerGroup().addTo(map);
 const wpLayer = L.layerGroup().addTo(map);
-const POI_MIN_ZOOM = { gas: 11, camp: 9, th: 7 };
+const POI_MIN_ZOOM = { gas: 11, camp: 9, th: 9 };
 const MAX_MARKERS = 400;
 for (const k of ['gas', 'camp', 'land', 'wp', 'th']) if (shown[k] === undefined) shown[k] = 1;
 

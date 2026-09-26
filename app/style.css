@@ -209,3 +209,11 @@ a { color: #6fa8ff; }
 .primary.alt { background: #2fbf4a; }
 
 .range-field { width: 110px; margin: 0 0 0 auto; text-align: right; }
+
+/* welcome */
+.welcome h3 { font-size: 22px; }
+.howto { padding-left: 18px; margin: 6px 0 10px; }
+.howto li { margin: 6px 0; font-size: 14px; }
+#welcome-rig button { font-size: 14px; }
+
+#update-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--safe-b)); z-index: 1150; background: #2fbf4a; color: #111; }

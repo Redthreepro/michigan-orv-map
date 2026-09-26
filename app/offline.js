@@ -273,7 +273,34 @@ $('#btn-save').addEventListener('click', () => {
 });
 
 // ---------- first open ----------
-if (IS_MOBILE && !isStandalone()) {
+function showWelcome() {
+  document.querySelectorAll('#welcome-rig button').forEach((b) => b.classList.toggle('on', +b.dataset.rig === rig));
+  $('#welcome-range').value = store.get('range', '') || '';
+  const inst = $('#welcome-install');
+  inst.hidden = !(IS_MOBILE && !isStandalone());
+  inst.textContent = IS_IOS
+    ? 'To use it with no signal: in Chrome tap Share (square with arrow) → Add to Home Screen, then always open it from that icon.'
+    : 'To use it with no signal: browser menu → Add to Home screen, then open it from that icon.';
+  openSheet('#panel-welcome');
+}
+document.querySelectorAll('#welcome-rig button').forEach((b) => b.addEventListener('click', () => {
+  setRig(+b.dataset.rig);
+  document.querySelectorAll('#welcome-rig button').forEach((x) => x.classList.toggle('on', x === b));
+}));
+function finishWelcome() {
+  const v = Math.round(+$('#welcome-range').value);
+  if (v > 0) { store.set('range', v); $('#fuel-range').value = v; }
+  store.set('welcomed', 1);
+  try { localStorage.setItem('orv.installTip', '1'); } catch {}  // the welcome already covered installing
+  $('#install-tip').hidden = true;
+  closeSheets();
+}
+$('#btn-welcome-go').addEventListener('click', finishWelcome);
+$('#panel-welcome .close').addEventListener('click', () => store.set('welcomed', 1));
+$('#btn-help').addEventListener('click', showWelcome);
+if (!store.get('welcomed', 0)) setTimeout(showWelcome, 600);
+
+if (IS_MOBILE && !isStandalone() && store.get('welcomed', 0)) {
   let seen = false;
   try { seen = localStorage.getItem('orv.installTip') === '1'; } catch {}
   if (!seen) {

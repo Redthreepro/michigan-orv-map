@@ -72,6 +72,7 @@
   <label class="row"><input type="checkbox" data-kind="land" checked><i class="sw land"></i>Free camping <small>state &amp; national forest land</small></label>
   <label class="row"><input type="checkbox" data-kind="wp" checked><i class="wp wp-pin sw-poi"></i>My waypoints</label>
   <button id="btn-wp-list" class="ghost">My waypoints <span id="wp-count"></span></button>
+  <button id="btn-help" class="ghost">How to use this map</button>
   <h2>My machine</h2>
   <div class="seg" id="rig-seg">
     <button data-rig="0" class="on">Show all</button>
@@ -189,7 +190,37 @@
   <button class="ghost btn-import">Import GPX (rides, waypoints, a shared trip)</button>
 </section>
 
+<!-- first open / help -->
+<section id="panel-welcome" class="sheet welcome" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <h3>Michigan ORV Map</h3>
+  <p class="hint">Every DNR ORV route, trail, forest road and closure, plus national forest roads. Works with no signal.</p>
+  <h2>What do you ride?</h2>
+  <div class="seg" id="welcome-rig">
+    <button data-rig="50">ATV / 50" or less</button>
+    <button data-rig="64">SxS 51–64"</button>
+    <button data-rig="72">SxS 65–72"</button>
+    <button data-rig="0">Show everything</button>
+  </div>
+  <p class="hint">Hides anything your machine isn't legally allowed on. Change it any time in Layers.</p>
+  <label class="row">Fuel range (optional)
+    <input id="welcome-range" class="field range-field" type="number" inputmode="numeric" min="5" max="600" placeholder="miles">
+  </label>
+  <h2>How to use it</h2>
+  <ul class="howto">
+    <li><b>Tap a trail</b> for its rules, width limit, closures and length.</li>
+    <li><b>Press and hold the map</b> to route there, add a trip stop, save a waypoint, check free camping, or get driving directions.</li>
+    <li><b>Orange P</b> icons are ORV parking. Tap one for "Drive here" in Google Maps.</li>
+    <li><b>&darr; button</b>: get ready before you lose signal. It saves your trip's map and checks everything.</li>
+    <li><b>&#9679; button</b>: record your ride.</li>
+  </ul>
+  <div id="welcome-install" class="note" hidden></div>
+  <button id="btn-welcome-go" class="primary">Start riding</button>
+</section>
+
 <div id="install-tip" hidden><span id="install-tip-text"></span><button class="x" aria-label="Dismiss">&times;</button></div>
+
+<button id="update-bar" class="chip" hidden>App updated. Tap to reload.</button>
 
 <div id="toast" hidden></div>
 

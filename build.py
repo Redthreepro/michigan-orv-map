@@ -364,8 +364,19 @@ def main():
                       "properties": {"t": "scramble", "n": name}})
     print(f"scramble areas     {len(areas):>5}")
 
+    # read last run's national forest roads before build_roads() overwrites the file (fallback below)
+    try:
+        prev_nf = [f for f in json.loads((OUT / "roads.geojson").read_text(encoding="utf-8"))["features"]
+                   if f["properties"].get("t") == "nf"]
+    except FileNotFoundError:
+        prev_nf = []
     road_feats = build_roads()
-    nf_feats = build_nf()
+    try:
+        nf_feats = build_nf()
+    except Exception as err:
+        # Forest Service server down: keep last run's national forest roads rather than failing the whole update
+        print(f"national forest fetch failed ({err}); reusing {len(prev_nf)} previous national forest roads")
+        nf_feats = prev_nf
     road_feats = road_feats + nf_feats
     (OUT / "roads.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": road_feats},
                                                   separators=(",", ":")), encoding="utf-8")
