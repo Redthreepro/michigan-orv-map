@@ -239,3 +239,24 @@ a { color: #6fa8ff; }
   text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 0 0 1px #fff; letter-spacing: .01em; }
 .town-label.big span { font-size: 14px; font-weight: 800; }
 .sw-town { width: 26px; font-style: normal; font-weight: 800; font-size: 13px; text-align: center; color: var(--text); }
+
+/* riding: next-turn banner */
+#nav-banner { position: fixed; top: calc(8px + var(--safe-t)); left: 8px; right: 8px; z-index: 1060; background: #1e6bff; color: #fff;
+  border-radius: 16px; box-shadow: 0 4px 16px #0009; cursor: pointer; overflow: hidden; }
+#nav-banner[hidden] { display: none; }
+.nav-main { display: flex; align-items: center; gap: 12px; padding: 12px 12px 10px; }
+.nav-arrow { width: 52px; height: 52px; flex: none; display: grid; place-items: center; transition: transform .2s; }
+.nav-arrow svg { width: 48px; height: 48px; }
+.nav-words { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nav-dist { font-size: 28px; font-weight: 800; line-height: 1.1; }
+.nav-text { font-size: 17px; font-weight: 600; line-height: 1.25; }
+.nav-end { flex: none; border: 0; border-radius: 10px; background: #fff; color: #1e6bff; font-weight: 800; padding: 12px 14px; cursor: pointer; }
+.nav-sub { background: #1553c7; padding: 8px 14px; font-size: 14px; }
+.nav-sub:empty { display: none; }
+body.navigating #topbar, body.navigating #route-bar { display: none !important; }
+body.navigating #chips { top: calc(150px + var(--safe-t)); }
+.primary.ride { background: #1e6bff; color: #fff; margin: 4px 0 10px; }
+#btn-compass svg { transition: transform .3s; }
+#btn-compass.on { box-shadow: 0 0 0 3px #1e6bff, 0 2px 10px #0007; }
+
+#btn-compass[hidden] { display: none; }

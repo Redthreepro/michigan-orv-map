@@ -48,6 +48,9 @@ roads open to ORVs (shown from zoom 10 in).
 - **AT&T signal** layer (off by default) from the FCC National Broadband Map: darker = good signal. Long-press
   shows signal at a spot; trips note camps with no signal. Refresh by downloading the new FCC file by hand
   (instructions in `build_coverage.py`) and running `python build_coverage.py`.
+- **Ride mode** ("Start riding" on a trip): next-turn banner (trail changes and real junction turns, noise
+  filtered), distance countdown, miles left, arrival and next-leg handoff, auto zoom near turns,
+  heading-up map (compass button toggles north-up), rerouting. No voice. Uses vendored leaflet-rotate.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

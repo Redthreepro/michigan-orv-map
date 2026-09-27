@@ -295,6 +295,7 @@ function showPlan() {
     html += '<div class="warns"><b>Heads up</b>' + warns.map((x, i) => `<div class="w ${x.level}" data-w="${i}">${esc(x.text)}</div>`).join('') + '</div>';
   } else if (planLegs.length) html += '<div class="warns ok"><b>No problems found</b> on this route.</div>';
 
+  if (planLegs.length) html += `<button class="primary ride" id="btn-plan-ride">Start riding</button>`;
   if (n >= 1 && !plan.stops[0].mine) html += `<div class="rec-row"><button class="ghost" id="btn-plan-drive">Drive to the start (Google Maps)</button><button class="ghost" id="btn-plan-send">Send directions</button></div>`;
 
   const ds = n >= 2 ? days() : [];
@@ -366,6 +367,7 @@ $('#route-body').addEventListener('click', async (e) => {
     if (plan && plan.stops.length > 2 && !confirm('Clear this whole trip?')) return;
     return clearPlan();
   }
+  if (btn && btn.id === 'btn-plan-ride') return window.startNav && startNav();
   if (btn && btn.id === 'btn-plan-drive') return driveTo(plan.stops[0].lat, plan.stops[0].lng);
   if (btn && btn.id === 'btn-plan-send') return sendDirections(plan.stops[0].lat, plan.stops[0].lng, plan.stops[0].name);
   if (btn && btn.id === 'btn-plan-gpx') return shareGpx(plan.stops.some((s) => s.night) ? 'ORV trip' : 'ORV route', planGpx());
@@ -521,6 +523,7 @@ window.onPlanPos = (pos) => {
   const bar = $('#route-bar');
   bar.hidden = false;
   bar.querySelector('span').textContent = `${fmtMi(legLeft)} to ${next.name}` + (after > 0 ? ` · ${fmtMi(legLeft + after)} total` : '');
+  if (window.onNavPos) onNavPos(near, pos);
 
   nav.off = near.d > OFF_ROUTE_M ? nav.off + 1 : 0;
   if (nav.off >= 3 && Date.now() - nav.last > 20000) {
@@ -530,6 +533,7 @@ window.onPlanPos = (pos) => {
       planLegs[near.leg] = redo;
       drawPlan(false);
       toast(`Off route. New route to ${next.name}: ${fmtMi(redo.meters)}`);
+      if (window.onNavPos) onNavPos(nearestOnPlan(lat, lng), pos); // banner follows the new route right away
     }
   }
 };

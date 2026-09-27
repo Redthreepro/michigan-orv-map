@@ -16,9 +16,10 @@ for (const k of ['gas', 'camp', 'land', 'wp', 'th', 'towns']) if (shown[k] === u
 if (shown.cov === undefined) shown.cov = 0; // AT&T coverage: off unless you turn it on
 
 // camping land sits under everything else
-map.createPane('land').style.zIndex = 350;
+map.createPane('land', ROT).style.zIndex = 350;
 // fade the whole pane, not each shape, so slightly overlapping parcels don't draw darker seams
 map.getPane('land').style.opacity = 0.22;
+map.getPane('land').style.pointerEvents = 'none';
 const landRenderer = L.canvas({ pane: 'land' });
 
 const GLYPH = {
@@ -92,8 +93,9 @@ function applyPlaces() {
 }
 
 // ---------- AT&T coverage (FCC map, built by build_coverage.py) ----------
-map.createPane('cov').style.zIndex = 360;
+map.createPane('cov', ROT).style.zIndex = 360;
 map.getPane('cov').style.opacity = 0.3;
+map.getPane('cov').style.pointerEvents = 'none';
 const covRenderer = L.canvas({ pane: 'cov' });
 let COV = null, covLayer = null, covLoading = null;
 function loadCoverage() {
@@ -167,7 +169,8 @@ map.on('moveend', updatePois);
 
 // ---------- town names ----------
 // The USGS topo only prints a few town names; draw our own, biggest first, skipping any that would overlap.
-map.createPane('labels').style.zIndex = 650; // above place icons; labels ignore taps so icons stay tappable
+// labels stay upright: they live with the markers in the non-rotating pane
+map.createPane('labels', map.getPane('norotatePane') || map.getPane('mapPane')).style.zIndex = 650; // above place icons; labels ignore taps so icons stay tappable
 map.getPane('labels').style.pointerEvents = 'none';
 const townLayer = L.layerGroup().addTo(map);
 const LABEL_DROP = 12; // px below the town point

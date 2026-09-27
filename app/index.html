@@ -22,12 +22,24 @@
   <ul id="results" hidden></ul>
 </div>
 
+<div id="nav-banner" hidden>
+  <div class="nav-main">
+    <span class="nav-arrow"></span>
+    <div class="nav-words"><b class="nav-dist"></b><span class="nav-text"></span></div>
+    <button class="nav-end" aria-label="End ride">End</button>
+  </div>
+  <div class="nav-sub"></div>
+</div>
+
 <div id="chips">
   <button id="rec-bar" class="chip" hidden><i></i><span></span></button>
   <button id="route-bar" class="chip" hidden><b>&#10148;</b><span></span><em class="x" aria-label="Clear route">&times;</em></button>
 </div>
 
 <div id="fabs">
+  <button id="btn-compass" class="fab" hidden aria-label="Heading up or north up">
+    <svg viewBox="0 0 24 24"><path d="M12 2 8 12h8z" fill="#e53935"/><path d="M12 22 8 12h8z" fill="currentColor"/></svg>
+  </button>
   <button id="btn-rec" class="fab" aria-label="Record ride">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle class="dot" cx="12" cy="12" r="5" fill="currentColor"/></svg>
   </button>
@@ -240,11 +252,13 @@
 <div id="toast" hidden></div>
 
 <script src="vendor/leaflet.js"></script>
+<script src="vendor/leaflet-rotate.js"></script>
 <script src="app.js"></script>
 <script src="tracks.js"></script>
 <script src="routing.js"></script>
 <script src="places.js"></script>
 <script src="plan.js"></script>
+<script src="nav.js"></script>
 <script src="offline.js"></script>
 <script src="gpx.js"></script>
 <script src="weather.js"></script>

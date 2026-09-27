@@ -29,13 +29,16 @@ const store = {
 
 // ---------- map ----------
 const view = store.get('view', { c: [44.6, -85.4], z: 7 });
-const map = L.map('map', { zoomControl: false, preferCanvas: true, maxZoom: 18, minZoom: 5 })
+// rotate: heading-up riding (leaflet-rotate); touch rotation stays off so the map never spins by accident
+const map = L.map('map', { zoomControl: false, preferCanvas: true, maxZoom: 18, minZoom: 5, rotate: true, touchRotate: false, rotateControl: false, bearing: 0 })
   .setView(view.c, view.z);
 const renderer = L.canvas({ tolerance: 14 });
 // fixed stacking: camping land (350) < forest roads (380) < trails (overlay, 400) < planned route (450) < markers
-map.createPane('roads').style.zIndex = 380;
+// custom panes go inside leaflet-rotate's rotating pane so they turn with the map in heading-up mode
+const ROT = map.getPane('rotatePane') || map.getPane('mapPane');
+map.createPane('roads', ROT).style.zIndex = 380;
 const roadRenderer = L.canvas({ pane: 'roads', tolerance: 10 });
-map.createPane('plan').style.zIndex = 450;
+map.createPane('plan', ROT).style.zIndex = 450;
 const planRenderer = L.canvas({ pane: 'plan' });
 map.attributionControl.setPrefix('');
 
@@ -283,7 +286,21 @@ function closeSheets() {
   if (highlight) { map.removeLayer(highlight); highlight = null; }
 }
 document.querySelectorAll('.sheet .close').forEach((b) => b.addEventListener('click', closeSheets));
-map.on('click', () => { closeSheets(); $('#results').hidden = true; });
+// Only the trails canvas (overlay pane) takes taps directly. Every other canvas covers the whole map, so it
+// must let taps through; forest roads are hit-tested here instead (same test Leaflet's canvas uses).
+for (const pane of ['roads', 'plan']) map.getPane(pane).style.pointerEvents = 'none';
+function roadAt(layerPoint) {
+  let hit = null;
+  if (!map.hasLayer(layers.road)) return null;
+  layers.road.eachLayer((cell) => cell.eachLayer((l) => { if (!hit && l._containsPoint && l._containsPoint(layerPoint)) hit = l; }));
+  return hit;
+}
+map.on('click', (e) => {
+  const road = e.layerPoint && roadAt(e.layerPoint);
+  if (road) return showDetail(road.feature, road, e.latlng);
+  closeSheets();
+  $('#results').hidden = true;
+});
 
 // ---------- layers panel ----------
 $('#btn-layers').addEventListener('click', () => { updateGroupCounts(); openSheet('#panel-layers'); });
@@ -385,7 +402,7 @@ function onPos(pos) {
   if (head) {
     const moving = heading != null && !isNaN(heading) && speed > 1;
     head.hidden = !moving;
-    if (moving) head.style.transform = `rotate(${heading}deg)`;
+    if (moving) head.style.transform = `rotate(${heading + (map.getBearing ? map.getBearing() : 0)}deg)`;
   }
   const bits = [`${lat.toFixed(5)}, ${lng.toFixed(5)}`, `±${Math.round(accuracy * 3.281)} ft`];
   if (altitude != null) bits.push(`${Math.round(altitude * 3.281)} ft elev`);
