@@ -201,7 +201,7 @@ async function renderList() {
     const s = stats(t);
     const on = shownTracks.has(t.id);
     return `<div class="ride" data-id="${esc(t.id)}">
-      <div class="ride-top"><b>${esc(t.name)}</b><small>${s.mi.toFixed(1)} mi · ${fmtDur(s.ms)}${s.mph ? ' · ' + s.mph.toFixed(0) + ' mph avg' : ''}${s.addedMi > 0.05 ? ` · ${s.addedMi.toFixed(1)} mi added by hand` : ''}</small></div>
+      <div class="ride-top" data-a="details"><b>${esc(t.name)}</b><small>${s.mi.toFixed(1)} mi · ${fmtDur(s.ms)}${s.mph ? ' · ' + s.mph.toFixed(0) + ' mph avg' : ''}${s.addedMi > 0.05 ? ` · ${s.addedMi.toFixed(1)} mi added by hand` : ''}</small></div>
       <div class="ride-btns">
         <button data-a="${on ? 'hide' : 'show'}">${on ? 'Hide' : 'Show'}</button>
         <button data-a="gpx">GPX</button>
@@ -214,6 +214,12 @@ async function renderList() {
   if (window.refreshProgress) refreshProgress(); // ride list changed: update ride-every-trail progress
 }
 $('#ride-list').addEventListener('click', async (e) => {
+  const top = e.target.closest('.ride-top');
+  if (top) {
+    const r = $('#ride-list')._rides.find((x) => x.id === top.closest('.ride').dataset.id);
+    if (r && window.showRideDetails) showRideDetails(r);
+    return;
+  }
   const btn = e.target.closest('button');
   if (!btn) return;
   const id = btn.closest('.ride').dataset.id;

@@ -68,7 +68,12 @@ let rig = store.get('rig', 0);
 if (![0, 50, 64, 72].includes(rig)) rig = 0; // old "Full-size" option was removed
 
 // p.lim = widest machine (inches) the DNR trail class legally allows; set by build.py
-function fits(p) { return !rig || p.t === 'scramble' || (p.lim || 0) >= rig; }
+function fits(p) {
+  if (!rig || p.t === 'scramble') return true;
+  // state forest roads carry no width class: open to any ORV size
+  const lim = p.lim != null ? p.lim : p.t === 'road' ? 999 : 0;
+  return lim >= rig;
+}
 function isClosed(p) { return /closed/i.test(p.s || ''); }
 
 // ---------- trail layers ----------
@@ -135,6 +140,7 @@ async function loadTrails() {
   fetch('data/roads.geojson').then((r) => r.json()).then((roads) => {
     buildRoadCells(roads.features);
     applyVisibility();
+    if (window.refreshProgress) refreshProgress(); // bonus forest-road progress needs the roads
   }).catch(() => toast('Could not load forest roads'));
   if (meta) {
     $('#data-info').textContent = `Trail data: Michigan DNR, checked ${meta.built} · ${meta.closures} ORV closure segments.`;
@@ -192,6 +198,7 @@ map.on('zoomend', applyVisibility);
 const ROAD_CELL = 0.25;
 const roadCells = [];
 let roadFeatures = [];
+Object.defineProperty(window, 'roadFeatures', { get: () => roadFeatures });
 function buildRoadCells(features) {
   roadFeatures = features;
   for (const c of roadCells) layers.road.removeLayer(c.layer);

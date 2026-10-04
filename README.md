@@ -57,6 +57,9 @@ roads open to ORVs (shown from zoom 10 in).
 - **Fix a ride by hand**: Edit → "Add a missed section" (forgot to start, phone died) or "Trace a ride by hand".
   Tap points; it follows the trails between taps. Added sections count toward miles and the trail goal but
   not ride time, are marked "added by hand", and can be removed.
+- **Ride details** (tap a ride's name): distance, moving/total time, avg moving & top speed, climbing,
+  elevation and speed charts (tap/drag for values), and the trails that ride covered.
+- **Bonus goal: forest roads** — state + national forest roads ridden, counted separately from the trail goal.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)

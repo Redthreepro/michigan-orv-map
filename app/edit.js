@@ -60,13 +60,27 @@ function endTrace() {
   $('#trace-bar').hidden = true;
 }
 
-// one leg: follow the trails between two taps; if they don't connect, a straight line (you rode something)
+// One leg between two taps. Only snaps to a trail/road right where you tapped (~250 ft); follows the
+// network only when it connects without a big detour; otherwise a straight line between your taps.
+const TRACE_SNAP_M = 75;
+const TRACE_DETOUR = 2.5;   // a trail path longer than 2.5x the straight distance (+~1/2 mi) is a wrong guess
 function traceLeg(a, b) {
-  const r = planLeg(L.latLng(a), L.latLng(b));
-  if (r.fail || !r.path.length) return { coords: [a, b], straight: true };
-  const coords = [a, ...r.path, b];
-  if (r.gap) return { coords: [a, ...r.path, r.gap.to, b], straight: true };
-  return { coords };
+  const straight = { coords: [a, b], straight: true };
+  const direct = hav(a[0], a[1], b[0], b[1]);
+  ROUTE_ANY = true;
+  try {
+    const S = candidates(a[0], a[1], 0)[0], T = candidates(b[0], b[1], 0)[0];
+    if (!S || !T || S.d > TRACE_SNAP_M || T.d > TRACE_SNAP_M) return straight;
+    const sol = solve(S, T);
+    if (!sol.endVia) return straight;
+    const path = assemble(S, T, sol).flatMap((l) => l.coords);
+    let len = 0;
+    for (let i = 1; i < path.length; i++) len += hav(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
+    if (len > direct * TRACE_DETOUR + 800) return straight;
+    return { coords: [a, ...path, b] };
+  } finally {
+    ROUTE_ANY = false;
+  }
 }
 window.traceAdd = (latlng) => {
   const p = [latlng.lat, latlng.lng];

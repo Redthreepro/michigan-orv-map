@@ -91,33 +91,81 @@ function nearRide(idx, lat, lng) {
   return false;
 }
 
+// Which parts of `items` the rides in `idx` covered. Only runs of 2+ samples in a row count
+// (just crossing a trail isn't riding it).
+function coverItems(items, idx) {
+  const pad = 0.001;
+  const covered = [];
+  for (const it of items) {
+    const [a, b, c, d] = it.bbox;
+    if (c < idx.bbox[0] - pad || a > idx.bbox[2] + pad || d < idx.bbox[1] - pad || b > idx.bbox[3] + pad) continue;
+    const runs = [];
+    let start = -1;
+    for (let i = 0; i <= it.samples.length; i++) {
+      const hit = i < it.samples.length && nearRide(idx, it.samples[i][0], it.samples[i][1]);
+      if (hit && start < 0) start = i;
+      if (!hit && start >= 0) { if (i - start >= 2) runs.push([start, i - 1]); start = -1; }
+    }
+    if (!runs.length) continue;
+    const n = runs.reduce((sum, [x, y]) => sum + (y - x + 1), 0);
+    covered.push({ item: it, runs, riddenM: Math.min(it.lenM, (n / it.samples.length) * it.lenM) });
+  }
+  return covered;
+}
+
+// ---------- forest roads (bonus goal) ----------
+// 46k road lines are too many to pre-sample on a phone; only roads near your rides get sampled.
+const ROAD_GOAL_KINDS = ['road', 'nf'];
+function roadMeta(f) {
+  if (f._meta) return f._meta;
+  const c = f.geometry.coordinates;
+  let a = 90, b = 180, cc = -90, d = -180, len = 0;
+  for (let i = 0; i < c.length; i++) {
+    const [x, y] = c[i];
+    a = Math.min(a, y); b = Math.min(b, x); cc = Math.max(cc, y); d = Math.max(d, x);
+    if (i) len += hav(c[i - 1][1], c[i - 1][0], y, x);
+  }
+  f._meta = { bbox: [a, b, cc, d], lenM: len };
+  return f._meta;
+}
+function roadItems(idx) {
+  const pad = 0.001, out = [];
+  for (const f of window.roadFeatures || []) {
+    if (!ROAD_GOAL_KINDS.includes(f.properties.t)) continue;
+    const m = roadMeta(f);
+    const [a, b, c, d] = m.bbox;
+    if (c < idx.bbox[0] - pad || a > idx.bbox[2] + pad || d < idx.bbox[1] - pad || b > idx.bbox[3] + pad) continue;
+    if (!f._item) { const { samples, lenM } = sampleLine(f.geometry.coordinates); f._item = { f, samples, lenM, bbox: m.bbox }; }
+    out.push(f._item);
+  }
+  return out;
+}
+
 async function computeProgress() {
   if (!allByKind.route) return null;
   const rides = (await allTracks().catch(() => [])).filter((t) => t.done && t.segs && t.segs.length);
-  const items = prepGoal();
   const idx = rideIndex(rides);
-  const pad = 0.001;
-  const covered = []; // [{ item, runs: [[startIdx, endIdx], ...], riddenM }]
-  if (rides.length) {
-    for (const it of items) {
-      const [a, b, c, d] = it.bbox;
-      if (c < idx.bbox[0] - pad || a > idx.bbox[2] + pad || d < idx.bbox[1] - pad || b > idx.bbox[3] + pad) continue;
-      // covered samples, keeping only runs of 2+ in a row (just crossing a trail doesn't count as riding it)
-      const runs = [];
-      let start = -1;
-      for (let i = 0; i <= it.samples.length; i++) {
-        const hit = i < it.samples.length && nearRide(idx, it.samples[i][0], it.samples[i][1]);
-        if (hit && start < 0) start = i;
-        if (!hit && start >= 0) { if (i - start >= 2) runs.push([start, i - 1]); start = -1; }
-      }
-      if (!runs.length) continue;
-      const n = runs.reduce((s, [x, y]) => s + (y - x + 1), 0);
-      covered.push({ item: it, runs, riddenM: Math.min(it.lenM, (n / it.samples.length) * it.lenM) });
-    }
-  }
-  progress = { rides, covered, at: Date.now() };
+  const covered = rides.length ? coverItems(prepGoal(), idx) : [];
+  const roadCovered = rides.length ? coverItems(roadItems(idx), idx) : [];
+  progress = { rides, covered, roadCovered, at: Date.now() };
   return progress;
 }
+
+// What one ride covered (for its details sheet): trail and road miles by name.
+window.rideCoverage = (ride) => {
+  const idx = rideIndex([ride]);
+  const byName = new Map();
+  for (const c of [...coverItems(prepGoal(), idx), ...coverItems(roadItems(idx), idx)]) {
+    const p = c.item.f.properties;
+    if (!fits(p)) continue; // a parallel trail your machine can't use isn't one you rode
+    const label = p.n || (KIND[p.t] ? KIND[p.t].label : 'trail');
+    const key = p.t + '|' + label;
+    const row = byName.get(key) || { name: label, kind: p.t, m: 0 };
+    row.m += c.riddenM;
+    byName.set(key, row);
+  }
+  return [...byName.values()].filter((r) => r.m > 80).sort((a, b) => b.m - a.m);
+};
 
 // totals for what your machine may ride, grouped by trail name
 function goalSummary() {
@@ -128,14 +176,35 @@ function goalSummary() {
     const p = it.f.properties;
     if (!fits(p)) continue;
     const key = p.t + '|' + (p.n || KIND[p.t].label);
-    const s = systems.get(key) || { name: p.n || KIND[p.t].label, kind: p.t, totalM: 0, riddenM: 0, items: [] };
+    const sys = systems.get(key) || { name: p.n || KIND[p.t].label, kind: p.t, totalM: 0, riddenM: 0, items: [] };
     const c = coveredBy.get(it);
-    s.totalM += it.lenM; s.riddenM += c ? c.riddenM : 0; s.items.push(it);
-    systems.set(key, s);
+    sys.totalM += it.lenM; sys.riddenM += c ? c.riddenM : 0; sys.items.push(it);
+    systems.set(key, sys);
     totalM += it.lenM; riddenM += c ? c.riddenM : 0;
   }
   const list = [...systems.values()];
-  return { totalM, riddenM, list, started: list.filter((s) => s.riddenM > 50), done: list.filter((s) => s.riddenM >= s.totalM * 0.9) };
+  return { totalM, riddenM, list, started: list.filter((x) => x.riddenM > 50), done: list.filter((x) => x.riddenM >= x.totalM * 0.9) };
+}
+
+// bonus: forest roads your machine may ride, state vs national
+let roadTotalsCache = null;
+function roadSummary() {
+  const key = rig + ':' + (window.roadFeatures || []).length;
+  if (!roadTotalsCache || roadTotalsCache.key !== key) {
+    const tot = { road: 0, nf: 0 };
+    for (const f of window.roadFeatures || []) {
+      if (ROAD_GOAL_KINDS.includes(f.properties.t) && fits(f.properties)) tot[f.properties.t] += roadMeta(f).lenM;
+    }
+    roadTotalsCache = { key, tot };
+  }
+  const rid = { road: 0, nf: 0 };
+  for (const c of (progress && progress.roadCovered) || []) {
+    const p = c.item.f.properties;
+    if (fits(p)) rid[p.t] += c.riddenM;
+  }
+  const t = roadTotalsCache.tot;
+  return { state: { totalM: t.road, riddenM: rid.road }, national: { totalM: t.nf, riddenM: rid.nf },
+    totalM: t.road + t.nf, riddenM: rid.road + rid.nf, loaded: (window.roadFeatures || []).length > 0 };
 }
 
 // ---------- map layers ----------
@@ -152,6 +221,12 @@ function drawProgress() {
     L.polyline(lines, { renderer: riddenRenderer, color: '#3b2a00', weight: 9, opacity: 0.35, interactive: false }).addTo(riddenLayer);
     L.polyline(lines, { renderer: riddenRenderer, color: '#ffc400', weight: 5, opacity: 0.95, interactive: false }).addTo(riddenLayer);
   }
+  const roadLines = [];
+  for (const c of progress.roadCovered || []) {
+    if (!fits(c.item.f.properties)) continue;
+    for (const [x, y] of c.runs) roadLines.push(c.item.samples.slice(x, y + 1));
+  }
+  if (roadLines.length) L.polyline(roadLines, { renderer: riddenRenderer, color: '#ffc400', weight: 3, opacity: 0.85, dashArray: '1 0', interactive: false }).addTo(riddenLayer);
   const tracks = progress.rides.flatMap((r) => r.segs.map((s) => s.map((p) => [p[0], p[1]])));
   if (tracks.length) L.polyline(tracks, { renderer: riddenRenderer, color: '#ff2fd0', weight: 3, opacity: 0.75, interactive: false }).addTo(allRidesLayer);
   applyProgressLayers();
@@ -175,7 +250,8 @@ function renderGoalCard() {
   const p = pct(s.riddenM, s.totalM);
   el.innerHTML = `<div class="goal-top"><b>Ride every trail in Michigan</b><span>${fmtPct(p)}</span></div>
     <div class="goal-bar"><span style="width:${p.toFixed(2)}%"></span></div>
-    <small>${fmtMi(s.riddenM)} of ${fmtMi(s.totalM)} ridden · ${s.started.length} of ${s.list.length} trails &amp; routes started${rig ? ` · for machines up to ${rig}"` : ''}</small>`;
+    <small>${fmtMi(s.riddenM)} of ${fmtMi(s.totalM)} ridden · ${s.started.length} of ${s.list.length} trails &amp; routes started${rig ? ` · for machines up to ${rig}"` : ''}</small>
+    ${(() => { const r = roadSummary(); return r.loaded ? `<small class="goal-bonus">Bonus: ${fmtMi(r.riddenM)} of ${fmtMi(r.totalM)} of forest roads</small>` : ''; })()}`;
 }
 function showGoal() {
   const s = goalSummary();
@@ -197,6 +273,13 @@ function showGoal() {
   } else html += '<p class="hint">Record a ride (the red button) and the trails you ride light up here and on the map in gold.</p>';
   html += `<details class="grp"><summary>Not ridden yet <small>${notYet.length}</small></summary><ul class="goal-list">` +
     notYet.map((x, i) => `<li data-g="n${i}"><div><b>${esc(x.name)}</b><small>${esc(KIND[x.kind].label)} · ${fmtMi(x.totalM)}</small></div></li>`).join('') + '</ul></details>';
+  const rs = roadSummary();
+  if (rs.loaded) {
+    const row = (label, x) => { const v = pct(x.riddenM, x.totalM); return `<li><div><b>${label}</b><small>${fmtMi(x.riddenM)} of ${fmtMi(x.totalM)}</small></div>
+      <span class="goal-pct">${fmtPct(v)}</span><div class="goal-bar"><span style="width:${v.toFixed(2)}%"></span></div></li>`; };
+    html += `<h2>Bonus: forest roads</h2><p class="hint">Not part of the trail goal above. Roads open to ORVs, counted separately.</p>
+      <ul class="goal-list bonus">${row('State forest roads', rs.state)}${row('National forest roads &amp; trails', rs.national)}</ul>`;
+  }
   html += `<div class="rec-row"><button class="ghost" id="btn-all-gpx">Share all rides as one GPX</button></div>`;
   $('#goal-body').innerHTML = html;
   openSheet('#panel-goal');

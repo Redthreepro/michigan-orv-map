@@ -67,7 +67,10 @@ function loadGraph() {
 }
 
 // ---------- rules ----------
+// Tracing a ride you already rode: any mapped trail or road counts, whatever its width rule or status.
+let ROUTE_ANY = false;
 function allowed(e) {
+  if (ROUTE_ANY) return true;
   const [, lim, , flags, dates] = G.attrs[G.eattr[e]];
   if (flags & FLAG.closed) return false;
   if (rig && lim < rig) return false;
@@ -121,7 +124,7 @@ function candidates(lat, lng, extraM) {
 // Connected pieces of the network for the current machine width (cached per width).
 const compCache = new Map();
 function components() {
-  const ck = rig + '|' + new Date().toDateString();
+  const ck = (ROUTE_ANY ? 'any' : rig) + '|' + new Date().toDateString();
   if (compCache.has(ck)) return compCache.get(ck);
   const N = G.nx.length, comp = new Int32Array(N).fill(-1);
   for (let s = 0; s < N; s++) {

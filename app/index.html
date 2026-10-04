@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=29">
+<link rel="stylesheet" href="style.css?v=33">
 </head>
 <body>
 <div id="map"></div>
@@ -213,6 +213,12 @@
   <button class="ghost btn-import">Import GPX</button>
 </section>
 
+<!-- ride details -->
+<section id="panel-ride-detail" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <div id="ride-detail-body"></div>
+</section>
+
 <!-- fix a ride -->
 <section id="panel-ride-edit" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
@@ -282,16 +288,17 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=29"></script>
-<script src="tracks.js?v=29"></script>
-<script src="routing.js?v=29"></script>
-<script src="places.js?v=29"></script>
-<script src="plan.js?v=29"></script>
-<script src="nav.js?v=29"></script>
-<script src="offline.js?v=29"></script>
-<script src="gpx.js?v=29"></script>
-<script src="weather.js?v=29"></script>
-<script src="progress.js?v=29"></script>
-<script src="edit.js?v=29"></script>
+<script src="app.js?v=33"></script>
+<script src="tracks.js?v=33"></script>
+<script src="routing.js?v=33"></script>
+<script src="places.js?v=33"></script>
+<script src="plan.js?v=33"></script>
+<script src="nav.js?v=33"></script>
+<script src="offline.js?v=33"></script>
+<script src="gpx.js?v=33"></script>
+<script src="weather.js?v=33"></script>
+<script src="progress.js?v=33"></script>
+<script src="details.js?v=33"></script>
+<script src="edit.js?v=33"></script>
 </body>
 </html>
