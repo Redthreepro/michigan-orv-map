@@ -103,6 +103,12 @@
     <button id="btn-wp-list" class="ghost">My waypoints list <span id="wp-count"></span></button>
   </details>
 
+  <details class="grp" data-grp="riding">
+    <summary>My riding <small class="grp-count"></small></summary>
+    <label class="row"><input type="checkbox" data-kind="ridden" checked><i class="sw ridden"></i>Trails I've ridden</label>
+    <label class="row"><input type="checkbox" data-kind="allrides"><i class="sw allrides"></i>All my rides</label>
+  </details>
+
   <details class="grp" data-grp="camping">
     <summary>Camping &amp; signal <small class="grp-count"></small></summary>
     <label class="row"><input type="checkbox" data-kind="land" checked><i class="sw land"></i>Free camping <small>state &amp; national forest</small></label>
@@ -198,6 +204,12 @@
   <button class="ghost btn-import">Import GPX</button>
 </section>
 
+<!-- ride-every-trail progress -->
+<section id="panel-goal" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <div id="goal-body"></div>
+</section>
+
 <!-- GPX import -->
 <section id="panel-import" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
@@ -208,6 +220,7 @@
 <!-- rides -->
 <section id="panel-rides" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
+  <div id="goal-card" class="goal-card"></div>
   <h2>Record a ride</h2>
   <p class="hint" id="rec-live"></p>
   <div id="rec-controls"></div>
@@ -262,5 +275,6 @@
 <script src="offline.js"></script>
 <script src="gpx.js"></script>
 <script src="weather.js"></script>
+<script src="progress.js"></script>
 </body>
 </html>

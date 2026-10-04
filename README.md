@@ -51,6 +51,9 @@ roads open to ORVs (shown from zoom 10 in).
 - **Ride mode** ("Start riding" on a trip): next-turn banner (trail changes and real junction turns, noise
   filtered), distance countdown, miles left, arrival and next-leg handoff, auto zoom near turns,
   heading-up map (compass button toggles north-up), rerouting. No voice. Uses vendored leaflet-rotate.
+- **Ride every trail**: all saved rides are matched against the DNR routes/trails your machine may ride
+  (35 m tolerance, 50 m checks, ride line filled between GPS points). Ridden parts show in gold; the Rides
+  panel shows overall % and a per-trail list; "All my rides" layer and one combined GPX.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)
@@ -63,3 +66,11 @@ python build.py
 This runs automatically every night at ~6am (GitHub Actions) and redeploys. Run it by hand only if you want a refresh right now, then commit and push `app/data/`.
 
 Data: Michigan DNR Trails Open Data (`DNRTrailsOPENDATA` FeatureServer). Basemap: USGS The National Map.
+
+## Before testing app changes
+
+```
+node tools/check-names.js
+```
+
+All app scripts share one global scope; this catches a name defined in two files (which silently breaks things).

@@ -205,6 +205,7 @@ async function renderList() {
       </div></div>`;
   }).join('');
   list._rides = rides;
+  if (window.refreshProgress) refreshProgress(); // ride list changed: update ride-every-trail progress
 }
 $('#ride-list').addEventListener('click', async (e) => {
   const btn = e.target.closest('button');

@@ -91,6 +91,8 @@ def slim(p, kind, name_field):
     name = clean(p.get(name_field)) or clean(p.get("TrailNamePrimary")) or ""
     out = {
         "t": kind,
+        # stable ID (from the DNR GlobalID) so ride progress survives nightly rebuilds
+        "id": (p.get("GlobalID") or "").strip("{}").replace("-", "")[:12] or None,
         "n": re.sub(r"\s+", " ", re.sub(r"[()]", "", name.removeprefix("ORV "))).strip(),
         "s": clean(p.get("OpenClosedStatusORV")),
         "w": clean(p.get("TrailWidthFeet")),
