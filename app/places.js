@@ -203,6 +203,8 @@ map.on('zoomend', applyPlaces);
 
 // ---------- place sheet (gas / campground / waypoint) ----------
 function showPlace(p, wp) {
+  // tracing a ride: tapping a trailhead, campground, gas station or waypoint drops the trace point right there
+  if (window.traceMode && traceMode()) return traceAdd(L.latLng(p.lat, p.lng));
   if (!wp && p.t === 'th') return showTrailhead(p);
   const kind = wp ? WP_TYPES[wp.type] || 'Waypoint' : p.t === 'gas' ? 'Gas station' : p.sub || 'Campground';
   const rows = wp ? [['Note', wp.note]] : [

@@ -126,7 +126,7 @@ async function loadTrails() {
     if (kind === 'road') { layers.road = L.featureGroup(); continue; }
     layers[kind] = L.geoJSON(null, {
       renderer, style: styleFor, filter: (f) => fits(f.properties),
-      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l, e.latlng); }),
+      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); if (window.traceMode && traceMode()) return traceAdd(e.latlng); showDetail(f, l, e.latlng); }),
     });
   }
   fillLayers();
@@ -206,7 +206,7 @@ function buildRoadCells(features) {
   for (const feats of buckets.values()) {
     const layer = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
       renderer: roadRenderer, style: styleFor,
-      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); showDetail(f, l, e.latlng); }),
+      onEachFeature: (f, l) => l.on('click', (e) => { L.DomEvent.stop(e); if (window.traceMode && traceMode()) return traceAdd(e.latlng); showDetail(f, l, e.latlng); }),
     });
     roadCells.push({ layer, bounds: layer.getBounds() });
   }
@@ -296,6 +296,7 @@ function roadAt(layerPoint) {
   return hit;
 }
 map.on('click', (e) => {
+  if (window.traceMode && traceMode()) return traceAdd(e.latlng);
   const road = e.layerPoint && roadAt(e.layerPoint);
   if (road) return showDetail(road.feature, road, e.latlng);
   closeSheets();

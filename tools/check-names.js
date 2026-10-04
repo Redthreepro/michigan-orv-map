@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const dir = path.join(__dirname, '..', 'app');
-const order = [...fs.readFileSync(path.join(dir, 'index.html'), 'utf8').matchAll(/<script src="(?!vendor\/)([^"]+)"/g)].map((m) => m[1]);
+const order = [...fs.readFileSync(path.join(dir, 'index.html'), 'utf8').matchAll(/<script src="(?!vendor\/)([^"?]+)[^"]*"/g)].map((m) => m[1]);
 const seen = {};
 let problems = 0;
 for (const file of order) {

@@ -279,3 +279,14 @@ body.navigating #chips { top: calc(150px + var(--safe-t)); }
 .goal-pct.done { color: #7bd88f; }
 .sw.ridden { height: 6px; background: #ffc400; box-shadow: 0 0 0 2px #3b2a0066; }
 .sw.allrides { height: 3px; background: #ff2fd0; }
+
+/* tracing a missed section */
+#trace-bar { position: fixed; top: calc(8px + var(--safe-t)); left: 8px; right: 8px; z-index: 1060; background: #2b1630; color: #fff;
+  border: 2px solid #ff2fd0; border-radius: 14px; padding: 10px 12px; box-shadow: 0 4px 16px #0009; }
+#trace-bar[hidden] { display: none; }
+.trace-main b { display: block; font-size: 16px; }
+.trace-main small { color: #e9b8e0; }
+.trace-btns { display: flex; gap: 8px; margin-top: 8px; }
+.trace-btns button { flex: 1; height: 40px; margin: 0; }
+.primary.small { height: 40px; margin: 0; }
+body.tracing #topbar, body.tracing #chips { display: none !important; }

@@ -1,17 +1,19 @@
 // Bump SHELL when app files change so phones pick up the new version.
-const SHELL = 'orv-shell-v23';
+const SHELL = 'orv-shell-v29';
 const DATA = 'orv-data';
 const TILES = 'orv-tiles';
 const SHELL_FILES = [
-  './', 'index.html', 'app.js', 'tracks.js', 'routing.js', 'places.js', 'plan.js', 'nav.js', 'offline.js', 'gpx.js', 'weather.js', 'progress.js', 'style.css', 'manifest.webmanifest',
+  './', 'index.html', 'app.js', 'tracks.js', 'routing.js', 'places.js', 'plan.js', 'nav.js', 'offline.js', 'gpx.js', 'weather.js', 'progress.js', 'edit.js', 'style.css', 'manifest.webmanifest',
   'vendor/leaflet.js', 'vendor/leaflet-rotate.js', 'vendor/leaflet.css', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
+const fresh = (url) => new Request(url, { cache: 'reload' });
 const DATA_FILES = ['data/trails.geojson', 'data/roads.geojson', 'data/graph.json', 'data/pois.json', 'data/camping_land.geojson', 'data/coverage.geojson', 'data/meta.json'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
-    await (await caches.open(SHELL)).addAll(SHELL_FILES);
-    await (await caches.open(DATA)).addAll(DATA_FILES);
+    // bypass the browser's HTTP cache so a new version never installs yesterday's files
+    await (await caches.open(SHELL)).addAll(SHELL_FILES.map(fresh));
+    await (await caches.open(DATA)).addAll(DATA_FILES.map(fresh));
     self.skipWaiting();
   })());
 });
@@ -39,8 +41,8 @@ self.addEventListener('message', (e) => {
   if (t === 'repair') {
     e.waitUntil((async () => {
       try {
-        await (await caches.open(SHELL)).addAll(SHELL_FILES);
-        await (await caches.open(DATA)).addAll(DATA_FILES);
+        await (await caches.open(SHELL)).addAll(SHELL_FILES.map(fresh));
+        await (await caches.open(DATA)).addAll(DATA_FILES.map(fresh));
         reply({ ok: true });
       } catch { reply({ ok: false }); }
     })());
@@ -93,7 +95,7 @@ self.addEventListener('fetch', (e) => {
   e.respondWith((async () => {
     const cache = await caches.open(SHELL);
     const hit = await cache.match(req, { ignoreSearch: true });
-    const refresh = fetch(req).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
+    const refresh = fetch(req, { cache: 'no-cache' }).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
     if (hit) { e.waitUntil(refresh); return hit; }
     return (await refresh) || new Response('Offline', { status: 504 });
   })());

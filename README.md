@@ -54,6 +54,9 @@ roads open to ORVs (shown from zoom 10 in).
 - **Ride every trail**: all saved rides are matched against the DNR routes/trails your machine may ride
   (35 m tolerance, 50 m checks, ride line filled between GPS points). Ridden parts show in gold; the Rides
   panel shows overall % and a per-trail list; "All my rides" layer and one combined GPX.
+- **Fix a ride by hand**: Edit → "Add a missed section" (forgot to start, phone died) or "Trace a ride by hand".
+  Tap points; it follows the trails between taps. Added sections count toward miles and the trail goal but
+  not ride time, are marked "added by hand", and can be removed.
 - **My machine** filter fades trails too narrow for your rig (50" / 64" / 72").
 
 ## Refresh trail data (closures change often)
@@ -66,6 +69,14 @@ python build.py
 This runs automatically every night at ~6am (GitHub Actions) and redeploys. Run it by hand only if you want a refresh right now, then commit and push `app/data/`.
 
 Data: Michigan DNR Trails Open Data (`DNRTrailsOPENDATA` FeatureServer). Basemap: USGS The National Map.
+
+## After changing app files
+
+```
+node tools/bump-version.js
+```
+
+Bumps the offline cache version and the `?v=` on script/style tags so phones and browsers never mix old and new files.
 
 ## Before testing app changes
 

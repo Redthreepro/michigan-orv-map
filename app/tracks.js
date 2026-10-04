@@ -37,12 +37,17 @@ function meters(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 function stats(t) {
-  let m = 0, ms = 0;
-  for (const seg of t.segs) {
-    for (let i = 1; i < seg.length; i++) m += meters(seg[i - 1], seg[i]);
+  let m = 0, ms = 0, recM = 0, addedM = 0;
+  const manual = new Set(t.manual || []);
+  t.segs.forEach((seg, k) => {
+    let segM = 0;
+    for (let i = 1; i < seg.length; i++) segM += meters(seg[i - 1], seg[i]);
+    m += segM;
+    if (manual.has(k)) { addedM += segM; return; } // traced by hand: miles, but no time
+    recM += segM;
     if (seg.length > 1) ms += seg[seg.length - 1][3] - seg[0][3];
-  }
-  return { mi: m / 1609.344, ms, mph: ms > 0 ? (m / 1609.344) / (ms / 3600000) : 0 };
+  });
+  return { mi: m / 1609.344, ms, mph: ms > 0 ? (recM / 1609.344) / (ms / 3600000) : 0, addedMi: addedM / 1609.344 };
 }
 const fmtDur = (ms) => {
   const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -178,7 +183,7 @@ function showTrack(t, fit = true) {
   if (!shownTracks.has(t.id)) {
     const line = L.polyline(t.segs.map((s) => s.map((p) => [p[0], p[1]])), { renderer, color: TRACK_COLOR, weight: 5, opacity: 0.85 })
       .addTo(map)
-      .on('click', (e) => { L.DomEvent.stop(e); renderList(); openSheet('#panel-rides'); });
+      .on('click', (e) => { L.DomEvent.stop(e); if (window.traceMode && traceMode()) return traceAdd(e.latlng); renderList(); openSheet('#panel-rides'); });
     shownTracks.set(t.id, line);
   }
   if (fit) map.fitBounds(shownTracks.get(t.id).getBounds(), { padding: [40, 40] });
@@ -196,10 +201,11 @@ async function renderList() {
     const s = stats(t);
     const on = shownTracks.has(t.id);
     return `<div class="ride" data-id="${esc(t.id)}">
-      <div class="ride-top"><b>${esc(t.name)}</b><small>${s.mi.toFixed(1)} mi · ${fmtDur(s.ms)}${s.mph ? ' · ' + s.mph.toFixed(0) + ' mph avg' : ''}</small></div>
+      <div class="ride-top"><b>${esc(t.name)}</b><small>${s.mi.toFixed(1)} mi · ${fmtDur(s.ms)}${s.mph ? ' · ' + s.mph.toFixed(0) + ' mph avg' : ''}${s.addedMi > 0.05 ? ` · ${s.addedMi.toFixed(1)} mi added by hand` : ''}</small></div>
       <div class="ride-btns">
         <button data-a="${on ? 'hide' : 'show'}">${on ? 'Hide' : 'Show'}</button>
         <button data-a="gpx">GPX</button>
+        <button data-a="edit">Edit</button>
         <button data-a="rename">Rename</button>
         <button data-a="del" class="danger">Delete</button>
       </div></div>`;
@@ -216,6 +222,7 @@ $('#ride-list').addEventListener('click', async (e) => {
   if (a === 'show') { showTrack(t); closeSheetsKeepTracks(); }
   if (a === 'hide') { hideTrack(id); renderList(); }
   if (a === 'gpx') exportGpx(t);
+  if (a === 'edit') window.editRide && editRide(t);
   if (a === 'rename') {
     const n = prompt('Name this ride', t.name);
     if (n && n.trim()) { t.name = n.trim().slice(0, 80); await putTrack(t); renderList(); }
@@ -230,8 +237,10 @@ function closeSheetsKeepTracks() { document.querySelectorAll('.sheet').forEach((
 // ---------- GPX ----------
 function gpx(t) {
   const x = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
-  const segs = t.segs.map((seg) => '<trkseg>' + seg.map((p) =>
-    `<trkpt lat="${p[0]}" lon="${p[1]}">${p[2] != null ? `<ele>${p[2]}</ele>` : ''}<time>${new Date(p[3]).toISOString()}</time></trkpt>`
+  const manual = new Set(t.manual || []);
+  // sections traced by hand have no real timestamps, so they're written without times
+  const segs = t.segs.map((seg, k) => '<trkseg>' + seg.map((p) =>
+    `<trkpt lat="${p[0]}" lon="${p[1]}">${p[2] != null ? `<ele>${p[2]}</ele>` : ''}${manual.has(k) ? '' : `<time>${new Date(p[3]).toISOString()}</time>`}</trkpt>`
   ).join('') + '</trkseg>').join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Michigan ORV Map" xmlns="http://www.topografix.com/GPX/1/1">

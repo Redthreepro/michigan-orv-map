@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
 <div id="map"></div>
@@ -29,6 +29,15 @@
     <button class="nav-end" aria-label="End ride">End</button>
   </div>
   <div class="nav-sub"></div>
+</div>
+
+<div id="trace-bar" hidden>
+  <div class="trace-main"><b id="trace-text"></b><small id="trace-sub"></small></div>
+  <div class="trace-btns">
+    <button id="btn-trace-undo" class="ghost small">Undo</button>
+    <button id="btn-trace-cancel" class="ghost small">Cancel</button>
+    <button id="btn-trace-save" class="primary small">Save</button>
+  </div>
 </div>
 
 <div id="chips">
@@ -204,6 +213,12 @@
   <button class="ghost btn-import">Import GPX</button>
 </section>
 
+<!-- fix a ride -->
+<section id="panel-ride-edit" class="sheet" hidden>
+  <button class="close" aria-label="Close">&times;</button>
+  <div id="ride-edit-body"></div>
+</section>
+
 <!-- ride-every-trail progress -->
 <section id="panel-goal" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
@@ -227,6 +242,7 @@
   <p class="hint">Keep the app open on screen while you ride. Phones stop GPS for web apps when the screen is off or you switch apps. The screen stays on while recording, so plug in if you can.</p>
   <h2>Saved rides</h2>
   <div id="ride-list"></div>
+  <button class="ghost" id="btn-trace-new">Trace a ride by hand</button>
   <button class="ghost btn-import">Import GPX (rides, waypoints, a shared trip)</button>
 </section>
 
@@ -266,15 +282,16 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js"></script>
-<script src="tracks.js"></script>
-<script src="routing.js"></script>
-<script src="places.js"></script>
-<script src="plan.js"></script>
-<script src="nav.js"></script>
-<script src="offline.js"></script>
-<script src="gpx.js"></script>
-<script src="weather.js"></script>
-<script src="progress.js"></script>
+<script src="app.js?v=29"></script>
+<script src="tracks.js?v=29"></script>
+<script src="routing.js?v=29"></script>
+<script src="places.js?v=29"></script>
+<script src="plan.js?v=29"></script>
+<script src="nav.js?v=29"></script>
+<script src="offline.js?v=29"></script>
+<script src="gpx.js?v=29"></script>
+<script src="weather.js?v=29"></script>
+<script src="progress.js?v=29"></script>
+<script src="edit.js?v=29"></script>
 </body>
 </html>
