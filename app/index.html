@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=39">
+<link rel="stylesheet" href="style.css?v=40">
 </head>
 <body>
 <div id="map"></div>
@@ -42,6 +42,9 @@
 
 <div id="chips">
   <button id="rec-bar" class="chip" hidden><i></i><span></span></button>
+  <button id="hunt-bar" class="chip" hidden><b>!</b><span></span></button>
+  <button id="sun-bar" class="chip" hidden><b>&#9788;</b><span></span></button>
+  <button id="checkin-bar" class="chip" hidden><b>&#10003;</b><span></span><em class="x" aria-label="Dismiss">&times;</em></button>
   <button id="upd-bar" class="chip" hidden><b>!</b><span></span></button>
   <button id="sel-bar" class="chip" hidden><b>&#10003;</b><span></span><em class="x" aria-label="Clear selection">&times;</em></button>
   <button id="route-bar" class="chip" hidden><b>&#10148;</b><span></span><em class="x" aria-label="Clear route">&times;</em></button>
@@ -71,7 +74,7 @@
   <button data-a="pause" class="ra-pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Pause</span></button>
   <button data-a="mark"><svg viewBox="0 0 24 24"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg><span>Mark</span></button>
   <button data-a="camp"><svg viewBox="0 0 24 24"><path d="M3 20 12 5l9 15M12 20l-3-5M12 20l3-5M2 20h20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Camp</span></button>
-  <button data-a="share"><svg viewBox="0 0 24 24"><path d="M12 15V3m0 0L7 8m5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Share spot</span></button>
+  <button data-a="sos" class="ra-sos"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3Zm0 6v5m0 3v.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>SOS / share</span></button>
 </div>
 
 <!-- trail detail -->
@@ -83,6 +86,7 @@
 <!-- layers + settings -->
 <section id="panel-layers" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
+  <div class="rec-row"><button id="btn-sos" class="ghost sos">SOS / emergency</button><button id="btn-laws" class="ghost">Rules &amp; permits</button></div>
   <button id="btn-updates" class="ghost">DNR trail updates (last 60 days)</button>
   <h2>My machine</h2>
   <div class="seg machines" id="rig-seg">
@@ -111,6 +115,7 @@
     <label class="row"><input type="checkbox" data-kind="road" checked><i class="sw road"></i>Forest roads <small>state (teal) &amp; national (brown)</small></label>
     <label class="row"><input type="checkbox" data-kind="closed" checked><i class="sw closed"></i>Closures &amp; reroutes</label>
     <label class="row"><input type="checkbox" data-kind="scramble" checked><i class="sw scramble"></i>Scramble areas</label>
+    <label class="row"><input type="checkbox" data-kind="hunt"><i class="sw hunt"></i>Public hunting land <small>deer-season hours apply</small></label>
   </details>
 
   <details class="grp" data-grp="places">
@@ -300,19 +305,21 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=39"></script>
-<script src="tracks.js?v=39"></script>
-<script src="routing.js?v=39"></script>
-<script src="places.js?v=39"></script>
-<script src="plan.js?v=39"></script>
-<script src="nav.js?v=39"></script>
-<script src="offline.js?v=39"></script>
-<script src="gpx.js?v=39"></script>
-<script src="weather.js?v=39"></script>
-<script src="progress.js?v=39"></script>
-<script src="details.js?v=39"></script>
-<script src="edit.js?v=39"></script>
-<script src="select.js?v=39"></script>
-<script src="updates.js?v=39"></script>
+<script src="app.js?v=40"></script>
+<script src="tracks.js?v=40"></script>
+<script src="routing.js?v=40"></script>
+<script src="places.js?v=40"></script>
+<script src="plan.js?v=40"></script>
+<script src="nav.js?v=40"></script>
+<script src="offline.js?v=40"></script>
+<script src="gpx.js?v=40"></script>
+<script src="weather.js?v=40"></script>
+<script src="progress.js?v=40"></script>
+<script src="details.js?v=40"></script>
+<script src="edit.js?v=40"></script>
+<script src="select.js?v=40"></script>
+<script src="updates.js?v=40"></script>
+<script src="laws.js?v=40"></script>
+<script src="safety.js?v=40"></script>
 </body>
 </html>

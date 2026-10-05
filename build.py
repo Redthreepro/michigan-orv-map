@@ -25,7 +25,7 @@ ASSETS = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR
 ORV_WHERE = "DESCRIP LIKE '%ORV%' OR COMMENTS LIKE '%ORV%'"
 OVERPASS = "https://overpass-api.de/api/interpreter"
 OSM_QUERY = ('[out:json][timeout:150];area["ISO3166-2"="US-MI"]->.mi;'
-             '(nwr["amenity"="fuel"](area.mi);nwr["tourism"="camp_site"](area.mi););out center tags;')
+             '(nwr["amenity"="fuel"](area.mi);nwr["tourism"="camp_site"](area.mi);nwr["amenity"="hospital"](area.mi););out center tags;')
 SCRAMBLE = "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNR_ORV_Scramble_Areas/FeatureServer/1"
 
 # layer id -> (type key, name field)
@@ -311,7 +311,7 @@ def build_pois(trail_features):
         osm = []
         try:
             old = json.loads((OUT / "pois.json").read_text(encoding="utf-8"))
-            pois += [p for p in old if p["t"] == "gas" or (p["t"] == "camp" and p.get("sub") not in dnr_subs)]
+            pois += [p for p in old if p["t"] in ("gas", "hosp") or (p["t"] == "camp" and p.get("sub") not in dnr_subs)]
         except FileNotFoundError:
             pass
     for e in osm:
@@ -319,6 +319,12 @@ def build_pois(trail_features):
         lat = e.get("lat") or e.get("center", {}).get("lat")
         lng = e.get("lon") or e.get("center", {}).get("lon")
         if lat is None:
+            continue
+        if tags.get("amenity") == "hospital":
+            # for the SOS card: nearest hospital (OSM tags emergency=yes on ones with an ER)
+            pois.append({"t": "hosp", "n": tags.get("name") or "Hospital", "lat": round(lat, 5), "lng": round(lng, 5),
+                         "ph": tags.get("phone"), "er": 1 if tags.get("emergency") == "yes" else None,
+                         "city": tags.get("addr:city")})
             continue
         if tags.get("amenity") == "fuel":
             name = tags.get("name") or tags.get("brand") or "Gas station"
@@ -418,6 +424,42 @@ def write_changes(prev_feats, features, now):
     print(f"trail changes today: {len(fresh)}  (log keeps {len(log)} from the last {CHANGE_DAYS} days)")
 
 
+def tag_hunting(feats):
+    """hl=1 on trails/roads mostly on public hunting land (land/hunt_land.geojson, from build_hunt.py):
+    those fall under the November firearm deer season riding hours."""
+    path = Path(__file__).parent / "land" / "hunt_land.geojson"
+    if not path.exists():
+        print("no land/hunt_land.geojson; skipping hunting-land tags (run build_hunt.py)")
+        return
+    import numpy as np
+    from shapely.geometry import shape
+    from shapely.strtree import STRtree
+    polys = [shape(f["geometry"]) for f in json.loads(path.read_text(encoding="utf-8"))["features"]]
+    tree = STRtree(polys)
+    pts, owner = [], []
+    for k, f in enumerate(feats):
+        g = shape(f["geometry"])
+        if g.geom_type not in ("LineString", "MultiLineString") or g.length == 0:
+            continue
+        n = max(2, min(12, int(g.length / 0.002) + 1))  # a sample about every 200 m, 2-12 per piece
+        for i in range(n):
+            pts.append(g.interpolate(i / (n - 1), normalized=True))
+            owner.append(k)
+    inside = np.zeros(len(pts), bool)
+    hit, _ = tree.query(pts, predicate="intersects")
+    inside[hit] = True
+    total, yes = {}, {}
+    for k, ins in zip(owner, inside):
+        total[k] = total.get(k, 0) + 1
+        yes[k] = yes.get(k, 0) + int(ins)
+    tagged = 0
+    for k, n in total.items():
+        if yes[k] * 2 >= n:
+            feats[k]["properties"]["hl"] = 1
+            tagged += 1
+    print(f"hunting land: {tagged} of {len(total)} pieces tagged")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     # last run's trails, to report what the DNR changed since then
@@ -460,6 +502,8 @@ def main():
         print(f"national forest fetch failed ({err}); reusing {len(prev_nf)} previous national forest roads")
         nf_feats = prev_nf
     road_feats = road_feats + nf_feats
+    tag_hunting(features)
+    tag_hunting(road_feats)
     (OUT / "roads.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": road_feats},
                                                   separators=(",", ":")), encoding="utf-8")
     print(f"roads.geojson {(OUT / 'roads.geojson').stat().st_size / 1e6:.1f} MB (state + national forest)")

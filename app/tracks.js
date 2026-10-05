@@ -63,6 +63,8 @@ let saveT = null;
 let tickT = null;
 
 window.isRecording = () => !!rec;
+// first recorded point of this ride (where the truck is, usually)
+window.rideStartPoint = () => { const p = rec && rec.segs.find((s) => s.length); return p ? p[0] : null; };
 
 function recLatLngs() { return rec.segs.map((s) => s.map((p) => [p[0], p[1]])); }
 function drawRec() {
@@ -203,18 +205,6 @@ async function dropWaypoint(type, name) {
   if (window.loadWaypoints) await loadWaypoints();
   return wp;
 }
-async function shareSpot() {
-  const at = hereNow();
-  if (!at) { ensureGps(); return toast('Waiting for GPS. Try again in a few seconds.'); }
-  const ll = `${at.lat.toFixed(5)},${at.lng.toFixed(5)}`;
-  const url = `https://www.google.com/maps/search/?api=1&query=${ll}`;
-  const text = `I'm here: ${ll}`;
-  if (navigator.share) {
-    try { await navigator.share({ title: 'My location', text, url }); return; } catch (err) { if (err.name === 'AbortError') return; }
-  }
-  try { await navigator.clipboard.writeText(`${text} ${url}`); toast('Location copied. Paste it in a text.'); }
-  catch { prompt('Copy your location:', `${text} ${url}`); }
-}
 // Pause/Resume needs a short hold (about half a second) so a bump doesn't flip it; the button fills while held.
 const HOLD_MS = 500;
 let holdT = null, holdDone = false;
@@ -249,7 +239,7 @@ $('#ride-actions').addEventListener('click', async (e) => {
     if (!rec.paused) pauseRec(); else putTrack(rec);
     toast('Camp saved and ride paused. Sleep well.');
   }
-  if (a === 'share') shareSpot();
+  if (a === 'sos') showSOS();
 });
 recBar.addEventListener('click', () => { renderList(); openSheet('#panel-rides'); });
 

@@ -20,6 +20,9 @@ roads open to ORVs (shown from zoom 10 in).
 - **Gas & campgrounds**: OpenStreetMap gas stations; DNR state forest + state park campgrounds plus OSM.
 - **Dispersed camping**: green-shaded state forest land more than 1 mile from a state forest campground
   (DNR rule). Long-press any spot to check it. Rebuild with `python build_land.py` (not nightly).
+- **Public hunting land**: trails on state forest, state game areas, national forest and Commercial Forest
+  land get `hl` (they fall under the Nov 15–30 riding hours). The outline lives in `land/hunt_land.geojson`;
+  rebuild it with `python build_hunt.py` (not nightly); `build.py` re-tags trails and roads every night.
 - **Waypoints**: save your own spots, route to them, add them to trips, share as GPX.
 - **Offline panel** (download button): a ready-for-no-signal checklist (home-screen app vs browser tab,
   app files saved, closure data age, storage protected, location allowed, trip map saved) plus

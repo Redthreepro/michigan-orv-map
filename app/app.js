@@ -140,6 +140,7 @@ async function loadTrails() {
   fillLayers();
   applyVisibility();
   if (window.refreshSel) refreshSel(); // bring back what was selected last time
+  if (window.drawHunt) drawHunt(true);
   // forest roads are big; load them after the trails are already on screen
   fetch('data/roads.geojson').then((r) => r.json()).then((roads) => {
     buildRoadCells(roads.features);
@@ -254,6 +255,7 @@ function showDetail(f, clicked, latlng) {
     ['Allowed', p.lim === 24 ? 'Motorcycles only' : p.lim >= 999 ? 'Any size ORV' : p.lim ? `Machines up to ${p.lim}" wide` : null], ['Trail width', p.w], ['Surface', p.sf], ['Length', total ? total.toFixed(1) + ' mi' : null],
     ['Ride time', total ? `About ${rideTimeText(total)} at ${RIDE_MPH[0]}–${RIDE_MPH[1]} mph` : null],
     ['County', p.co], ['Runs on', p.rd],
+    ['Hunting land', p.hl ? 'Public. Nov 15–30: no riding 7–11 a.m. and 2–5 p.m.' : null],
     ['Open', p.t === 'nf' ? (p.dates ? fmtDates(p.dates) : 'All year') : null], ['Forest', p.forest ? p.forest + ' National Forest' : null],
   ].filter(([, v]) => v);
   const kindLabel = p.t === 'nf' && p.sub === 'trail' ? 'National forest trail' : KIND[p.t].label;
@@ -319,6 +321,7 @@ function setRig(v) {
     if (roadFeatures.length) buildRoadCells(roadFeatures);
     applyVisibility();
     if (window.refreshSel) refreshSel();
+    if (window.drawHunt) drawHunt(true);
   }
 }
 document.querySelectorAll('#rig-seg button').forEach((b) => b.addEventListener('click', () => setRig(+b.dataset.rig)));
