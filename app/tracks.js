@@ -7,9 +7,9 @@ const MAX_ACC_M = 40;       // ignore fixes worse than this
 
 // ---------- storage ----------
 const db = new Promise((resolve, reject) => {
-  const req = indexedDB.open('orv', 2);
+  const req = indexedDB.open('orv', 3);
   req.onupgradeneeded = () => {
-    for (const name of ['tracks', 'waypoints']) {
+    for (const name of ['tracks', 'waypoints', 'photos']) {
       if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name, { keyPath: 'id' });
     }
   };
@@ -117,6 +117,7 @@ function startRec() {
   lockScreen();
   refreshRecUi();
   toast('Recording. Keep the app open. The screen will stay on.');
+  if (window.offerStartPhoto) offerStartPhoto();
 }
 function pauseRec() {
   rec.paused = true; putTrack(rec); unlockScreen(); refreshRecUi();
@@ -139,7 +140,8 @@ async function stopRec() {
   rec = null; drawRec(); unlockScreen();
   showTrack(saved, false);
   refreshRecUi(); renderList();
-  toast(`Saved: ${s.mi.toFixed(1)} mi`);
+  $('#photo-bar').hidden = true;
+  if (window.offerEndPhoto) offerEndPhoto(saved, s.mi); else toast(`Saved: ${s.mi.toFixed(1)} mi`);
 }
 
 function ensureGps() {
@@ -236,10 +238,10 @@ function hereNow() {
   return p ? L.latLng(p[0], p[1]) : null;
 }
 const timeNow = () => new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-async function dropWaypoint(type, name) {
+async function dropWaypoint(type, name, extra) {
   const at = hereNow();
   if (!at) { ensureGps(); toast('Waiting for GPS. Try again in a few seconds.'); return null; }
-  const wp = { id: 'w' + Date.now(), lat: +at.lat.toFixed(6), lng: +at.lng.toFixed(6), name, type, note: rec ? `On ${rec.name}` : '' };
+  const wp = { id: 'w' + Date.now(), lat: +at.lat.toFixed(6), lng: +at.lng.toFixed(6), name, type, note: rec ? `On ${rec.name}` : '', ...(rec ? { rideId: rec.id } : {}), ...(extra || {}) };
   await tx('readwrite', (s) => s.put(wp), 'waypoints');
   if (window.loadWaypoints) await loadWaypoints();
   return wp;
@@ -266,10 +268,7 @@ $('#ride-actions').addEventListener('click', async (e) => {
   const a = e.target.closest('button')?.dataset.a;
   if (!a || !rec) return;
   if (a === 'pause' && !holdDone) toast(`Hold the button to ${rec.paused ? 'resume' : 'pause'}`);
-  if (a === 'mark') {
-    const wp = await dropWaypoint('pin', 'Mark ' + timeNow());
-    if (wp) toast(`Saved "${wp.name}" at your spot. Rename it in Waypoints.`);
-  }
+  if (a === 'mark') showMarkMenu();
   if (a === 'camp') {
     if (!confirm('Stop for the night? This pauses the ride and saves a camp spot here. Tap Resume in the morning, even if the app was closed.')) return;
     const wp = await dropWaypoint('camp', 'Camp ' + fmtDate(Date.now()));

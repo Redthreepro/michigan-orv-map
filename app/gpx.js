@@ -115,14 +115,15 @@ $('#import-body').addEventListener('click', async (e) => {
 async function backupAll() {
   const rides = (await allTracks().catch(() => [])).filter((t) => t.done);
   const wps = (await tx('readonly', (s) => s.getAll(), 'waypoints').catch(() => [])) || [];
+  const photos = window.photosForBackup ? await photosForBackup() : [];
   const data = { app: 'michigan-orv-map', version: 1, made: new Date().toISOString(), rides, waypoints: wps, trip: plan,
-    settings: { rig, base: baseKey, shown } };
+    settings: { rig, base: baseKey, shown }, photos, plans: store.get('plans', []) };
   const d = new Date();
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const ok = await shareFile(`orv-map-backup-${day}.json`, JSON.stringify(data), 'application/json');
   if (ok) {
     try { localStorage.setItem('orv.lastBackup', String(Date.now())); } catch {}
-    toast(`Backed up ${rides.length} ride${rides.length === 1 ? '' : 's'} and ${wps.length} waypoint${wps.length === 1 ? '' : 's'}`);
+    toast(`Backed up ${rides.length} ride${rides.length === 1 ? '' : 's'}, ${wps.length} waypoint${wps.length === 1 ? '' : 's'} and ${photos.length} photo${photos.length === 1 ? '' : 's'}`);
     if (window.refreshOffline) refreshOffline();
   }
 }
@@ -138,8 +139,10 @@ async function restoreAll() {
   if (!confirm(`Restore ${rides.length} ride(s) and ${wps.length} waypoint(s)? Anything with the same name/ID is replaced; nothing else is deleted.`)) return;
   for (const r of rides) await putTrack(r);
   for (const w of wps) await tx('readwrite', (s) => s.put(w), 'waypoints');
+  if (data.photos && window.restorePhotos) await restorePhotos(data.photos);
+  if (Array.isArray(data.plans)) { const have = store.get('plans', []); store.set('plans', [...have.filter((p) => !data.plans.some((q) => q.id === p.id)), ...data.plans]); }
   if (data.trip && (!plan || !plan.stops.length)) { plan = data.trip; savePlan(); computePlan({ show: false }); }
-  if (data.settings && [0, 50, 64, 72].includes(data.settings.rig)) setRig(data.settings.rig);
+  if (data.settings && [0, 24, 50, 64, 72].includes(data.settings.rig)) setRig(data.settings.rig);
   await loadWaypoints();
   renderList();
   toast('Restored');

@@ -128,6 +128,7 @@ function showRideDetails(t) {
       return `<li><div><b>${esc(c.name)}</b>${kind && kind !== c.name ? `<small>${esc(kind)}</small>` : ''}</div><span class="goal-pct">${fmtMi(c.m)}</span></li>`;
     }).join('') + '</ul>';
   }
+  if (window.ridePhotosHtml) html += ridePhotosHtml(t);
   html += `<div class="rec-row"><button class="ghost" data-a="show">Show on map</button><button class="ghost" data-a="edit">Edit</button><button class="ghost" data-a="gpx">GPX</button></div>`;
   const body = $('#ride-detail-body');
   body.innerHTML = html;

@@ -28,11 +28,13 @@ const GLYPH = {
   trailhead: '<svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-3 4 3 4H6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   th: '<svg viewBox="0 0 24 24"><path d="M8 20V4h5.5a4.5 4.5 0 0 1 0 9H8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   pin: '<svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="3" fill="currentColor"/></svg>',
+  photo: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  report: '<svg viewBox="0 0 24 24"><path d="M12 4 2.5 20h19L12 4Zm0 6v4.5m0 2.5v.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
-const WP_TYPES = { camp: 'Camp spot', gas: 'Gas', trailhead: 'Trailhead', pin: 'Other' };
+const WP_TYPES = { camp: 'Camp spot', gas: 'Gas', trailhead: 'Trailhead', pin: 'Other', photo: 'Photo', report: 'Trail report' };
 
 function poiIcon(kind) { return L.divIcon({ className: 'poi poi-' + kind, html: GLYPH[kind], iconSize: [24, 24] }); }
-function wpIcon(type) { return L.divIcon({ className: 'wp wp-' + type, html: GLYPH[type] || GLYPH.pin, iconSize: [30, 30], iconAnchor: [15, 30] }); }
+function wpIcon(type, extra = '') { return L.divIcon({ className: 'wp wp-' + type + extra, html: GLYPH[type] || GLYPH.pin, iconSize: [30, 30], iconAnchor: [15, 30] }); }
 
 // ---------- load ----------
 fetch('data/pois.json').then((r) => r.json()).then((p) => { window.POIS = p; updatePois(); updateTowns(); }).catch(() => {});
@@ -218,6 +220,7 @@ function showPlace(p, wp) {
     const c = campingAt(p.lat, p.lng);
     if (wp) html += `<div class="note ${c.ok ? '' : 'restrict'}">${esc(c.text)}</div>`;
   }
+  if (wp && window.spotExtras) html += spotExtras(wp);
   html += `<div class="rec-row"><button class="primary" data-a="route">Route here</button><button class="ghost" data-a="trip">Add to trip</button></div>`;
   html += DIR_BTNS;
   html += wp
@@ -227,13 +230,14 @@ function showPlace(p, wp) {
   $('#sheet-body').onclick = async (e) => {
     const a = e.target.closest('button')?.dataset.a;
     const ll = L.latLng(p.lat, p.lng), name = (wp || p).n || (wp || p).name;
+    if (wp && window.spotClick && await spotClick(wp, a)) return;
     if (a === 'route') routeHere(ll, name);
     if (a === 'trip') addToTrip(ll, name);
     if (a === 'save') editWaypoint({ lat: p.lat, lng: p.lng, name, type: p.t === 'gas' ? 'gas' : 'camp' });
     if (a === 'drive') driveTo(p.lat, p.lng);
     if (a === 'send') sendDirections(p.lat, p.lng, name);
     if (a === 'edit') editWaypoint(wp);
-    if (a === 'del' && confirm(`Delete waypoint "${wp.name}"?`)) { await tx('readwrite', (s) => s.delete(wp.id), 'waypoints'); closeSheets(); loadWaypoints(); }
+    if (a === 'del' && confirm(`Delete waypoint "${wp.name}"?`)) { if (window.dropPhotos) await dropPhotos(wp); await tx('readwrite', (s) => s.delete(wp.id), 'waypoints'); closeSheets(); loadWaypoints(); }
   };
   openSheet('#sheet');
 }
@@ -299,7 +303,9 @@ window.nearestTrailhead = (lat, lng) => {
 // ---------- waypoints ----------
 let editing = null;
 function editWaypoint(wp) {
-  editing = { id: wp.id || 'w' + Date.now(), lat: wp.lat, lng: wp.lng, name: wp.name || '', type: wp.type || 'pin', note: wp.note || '' };
+  // keep extra fields (photos, ride, report details) when editing
+  editing = { ...wp, id: wp.id || 'w' + Date.now(), lat: wp.lat, lng: wp.lng, name: wp.name || '', type: wp.type || 'pin', note: wp.note || '' };
+  if (window.drawWpPhotos) setTimeout(drawWpPhotos, 0);
   $('#wp-name').value = editing.name;
   $('#wp-note').value = editing.note;
   document.querySelectorAll('#wp-type button').forEach((b) => b.classList.toggle('on', b.dataset.type === editing.type));
@@ -327,7 +333,8 @@ async function loadWaypoints() {
   waypoints = (await tx('readonly', (s) => s.getAll(), 'waypoints').catch(() => [])) || [];
   wpLayer.clearLayers();
   for (const w of waypoints) {
-    L.marker([w.lat, w.lng], { icon: wpIcon(w.type), zIndexOffset: 800 })
+    // trail reports fade after a month: conditions have probably changed
+    L.marker([w.lat, w.lng], { icon: wpIcon(w.type, w.type === 'report' && Date.now() - (w.at || 0) > 30 * 86400000 ? ' old' : ''), zIndexOffset: 800 })
       .on('click', (e) => { L.DomEvent.stop(e); showPlace({ lat: w.lat, lng: w.lng, n: w.name }, w); })
       .addTo(wpLayer);
   }

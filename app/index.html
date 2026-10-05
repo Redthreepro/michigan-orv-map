@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=41">
+<link rel="stylesheet" href="style.css?v=42">
 </head>
 <body>
 <div id="map"></div>
@@ -42,6 +42,7 @@
 
 <div id="chips">
   <button id="rec-bar" class="chip" hidden><i></i><span></span></button>
+  <button id="photo-bar" class="chip" hidden><b>&#128247;</b><span>Take a start photo</span><em class="x" aria-label="No thanks">&times;</em></button>
   <button id="hunt-bar" class="chip" hidden><b>!</b><span></span></button>
   <button id="sun-bar" class="chip" hidden><b>&#9788;</b><span></span></button>
   <button id="checkin-bar" class="chip" hidden><b>&#10003;</b><span></span><em class="x" aria-label="Dismiss">&times;</em></button>
@@ -70,6 +71,7 @@
 
 <div id="scale-info"></div>
 
+<div id="photo-view" hidden><figure><img alt=""><figcaption></figcaption></figure><span class="pv-close">&times;</span></div>
 <div id="ride-dash" hidden>
   <div class="d-speed"><b id="dash-speed">–</b><small>mph</small></div>
   <div><b id="dash-mi">0.0</b><small>miles</small></div>
@@ -94,6 +96,7 @@
   <button class="close" aria-label="Close">&times;</button>
   <div class="rec-row"><button id="btn-sos" class="ghost sos">SOS / emergency</button><button id="btn-laws" class="ghost">Rules &amp; permits</button></div>
   <button id="btn-updates" class="ghost">DNR trail updates (last 60 days)</button>
+  <button id="btn-plans" class="ghost">My saved ride plans</button>
   <h2>My machine</h2>
   <div class="seg machines" id="rig-seg">
     <button data-rig="24">Dirt bike</button>
@@ -220,8 +223,12 @@
     <button data-type="gas">Gas</button>
     <button data-type="trailhead">Trailhead</button>
     <button data-type="pin">Other</button>
+    <button data-type="photo">Photo</button>
+    <button data-type="report">Trail report</button>
   </div>
   <textarea id="wp-note" class="field" rows="2" placeholder="Note (optional)" maxlength="500"></textarea>
+  <div id="wp-photos"></div>
+  <button id="btn-wp-photo" class="ghost">Add a photo</button>
   <p class="hint" id="wp-camp"></p>
   <button id="btn-wp-save" class="primary">Save waypoint</button>
 </section>
@@ -312,22 +319,23 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=41"></script>
-<script src="tracks.js?v=41"></script>
-<script src="routing.js?v=41"></script>
-<script src="places.js?v=41"></script>
-<script src="plan.js?v=41"></script>
-<script src="nav.js?v=41"></script>
-<script src="offline.js?v=41"></script>
-<script src="gpx.js?v=41"></script>
-<script src="weather.js?v=41"></script>
-<script src="progress.js?v=41"></script>
-<script src="details.js?v=41"></script>
-<script src="edit.js?v=41"></script>
-<script src="select.js?v=41"></script>
-<script src="updates.js?v=41"></script>
-<script src="laws.js?v=41"></script>
-<script src="safety.js?v=41"></script>
-<script src="merge.js?v=41"></script>
+<script src="app.js?v=42"></script>
+<script src="tracks.js?v=42"></script>
+<script src="routing.js?v=42"></script>
+<script src="places.js?v=42"></script>
+<script src="plan.js?v=42"></script>
+<script src="nav.js?v=42"></script>
+<script src="offline.js?v=42"></script>
+<script src="gpx.js?v=42"></script>
+<script src="weather.js?v=42"></script>
+<script src="progress.js?v=42"></script>
+<script src="details.js?v=42"></script>
+<script src="edit.js?v=42"></script>
+<script src="select.js?v=42"></script>
+<script src="updates.js?v=42"></script>
+<script src="laws.js?v=42"></script>
+<script src="safety.js?v=42"></script>
+<script src="merge.js?v=42"></script>
+<script src="spots.js?v=42"></script>
 </body>
 </html>

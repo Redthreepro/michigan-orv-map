@@ -157,6 +157,61 @@ function selToTrip() {
   computePlan();
 }
 
+// ---------- saved ride plans ----------
+// A named copy of the selection (whole trails and/or picked rides), kept on this phone and in backups.
+function saveRidePlan() {
+  if (!selItems.length) return;
+  const name = prompt('Name this ride plan', selItems.length === 1 ? selItems[0].name : `${selItems[0].name} + ${selItems.length - 1} more`);
+  if (name === null) return;
+  const plans = store.get('plans', []);
+  const items = selItems.map(({ key, name: n, kind, mi, p, lines, dots }) => ({ key, name: n, kind, mi, p, lines, dots }));
+  plans.push({ id: 'r' + Date.now(), name: (name.trim() || 'Ride plan').slice(0, 80), items, mi: +selMiles().toFixed(1), made: Date.now() });
+  store.set('plans', plans);
+  toast(`Saved "${plans[plans.length - 1].name}"`);
+  showSel();
+}
+function selBounds(items) {
+  const b = L.latLngBounds([]);
+  for (const it of items) {
+    if (it.lines) b.extend(L.latLngBounds(it.lines.flat()));
+    else { const fs = featsFor(it); if (fs.length) b.extend(L.geoJSON({ type: 'FeatureCollection', features: fs }).getBounds()); }
+  }
+  return b;
+}
+function showRidePlans() {
+  const plans = store.get('plans', []).slice().sort((a, b) => b.made - a.made);
+  let html = '<h3>My saved ride plans</h3>';
+  html += plans.length ? plans.map((p) => `<div class="ride" data-id="${esc(p.id)}">
+      <div class="ride-top" data-a="load"><b>${esc(p.name)}</b><small>${p.mi.toFixed(1)} mi · about ${rideTimeText(p.mi)} · ${p.items.length} part${p.items.length > 1 ? 's' : ''}</small></div>
+      <div class="ride-btns"><button data-a="load">Show</button>${p.items.some((i) => i.dots) ? '<button data-a="trip">Trip</button>' : ''}<button data-a="rename">Rename</button><button data-a="del" class="danger">Delete</button></div></div>`).join('')
+    : '<p class="hint">No saved ride plans yet. Select trails or pick the part you\'ll ride, then tap "Save this ride plan".</p>';
+  $('#sheet-body').innerHTML = html;
+  $('#sheet-body').onclick = (e) => {
+    const el = e.target.closest('[data-a]');
+    const row = e.target.closest('.ride');
+    if (!el || !row) return;
+    const all = store.get('plans', []);
+    const p = all.find((x) => x.id === row.dataset.id);
+    if (!p) return;
+    const a = el.dataset.a;
+    if (a === 'load' || a === 'trip') {
+      selItems = JSON.parse(JSON.stringify(p.items)).filter((it) => it.lines || featsFor(it).length);
+      drawSel();
+      const b = selBounds(selItems);
+      if (b.isValid()) map.fitBounds(b, { padding: [40, 40] });
+      if (a === 'trip') selToTrip(); else showSel();
+    }
+    if (a === 'rename') {
+      const n = prompt('Name this ride plan', p.name);
+      if (n && n.trim()) { p.name = n.trim().slice(0, 80); store.set('plans', all); showRidePlans(); }
+    }
+    if (a === 'del' && confirm(`Delete the ride plan "${p.name}"?`)) { store.set('plans', all.filter((x) => x !== p)); showRidePlans(); }
+  };
+  openSheet('#sheet');
+}
+window.showRidePlans = showRidePlans;
+$('#btn-plans').addEventListener('click', showRidePlans);
+
 // one whole trail: its own info sheet; anything else: the list with each one's miles and the total
 function showSel() {
   if (selItems.length === 1 && !selItems[0].dots) {
@@ -176,7 +231,9 @@ function showSel() {
   if (!picks && selItems.length > 1) html += '<p class="hint">Whole trails, every branch and loop. To add up only the part you\'ll ride, tap "Pick the part you\'ll ride".</p>';
   html += `<div class="rec-row"><button class="ghost" data-a="add">+ Add another trail</button><button class="ghost" data-a="pick">Pick the part you'll ride</button></div>`;
   if (picks) html += '<button class="primary" data-a="trip">Make it a trip (for navigation)</button>';
-  html += '<button class="ghost" data-a="clear">Clear selection</button>';
+  html += '<div class="rec-row"><button class="ghost" data-a="save">Save this ride plan</button><button class="ghost" data-a="clear">Clear selection</button></div>';
+  const saved = store.get('plans', []).length;
+  if (saved) html += `<button class="ghost" data-a="plans">My saved ride plans (${saved})</button>`;
   $('#sheet-body').innerHTML = html;
   $('#sheet-body').onclick = (e) => {
     const b = e.target.closest('button');
@@ -188,6 +245,8 @@ function showSel() {
     if (a === 'pick') startPick();
     if (a === 'trip') selToTrip();
     if (a === 'clear') clearSel();
+    if (a === 'save') saveRidePlan();
+    if (a === 'plans') showRidePlans();
   };
   openSheet('#sheet');
 }
