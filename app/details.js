@@ -114,7 +114,7 @@ function showRideDetails(t) {
     ['Avg moving', m.avgMph ? `${m.avgMph.toFixed(0)} mph` : '–'], ['Top speed', m.topMph ? `${m.topMph.toFixed(0)} mph` : '–'],
     ['Climbed', m.maxFt != null ? ft(m.gainFt) : '–'], ['Total time', fmtDur(m.totalMs)],
   ];
-  let html = `<h3>${esc(t.name)}</h3><p class="hint">${esc(date)}${m.addedMi > 0.05 ? ` · includes ${m.addedMi.toFixed(1)} mi added by hand` : ''}</p>
+  let html = `<h3>${esc(t.name)}</h3><p class="hint">${esc(date)}${m.addedMi > 0.05 ? ` · includes ${m.addedMi.toFixed(1)} mi added by hand` : ''}${t.parts && t.parts.length > 1 ? ` · joined from ${t.parts.length} rides (Edit to separate)` : ''}</p>
     <div class="tiles">${tiles.map(([k, v]) => `<div class="tile"><small>${k}</small><b>${v}</b></div>`).join('')}</div>`;
   const elev = lineChart(m.prof.map((p) => [p[0], p[1]]), { unit: 'ft', color: '#7bd88f', fmt: (v) => Math.round(v).toLocaleString() });
   if (elev) html += `<h2>Elevation (ft)</h2><div class="chart-wrap">${elev}</div><p class="hint">${ft(m.minFt)} to ${ft(m.maxFt)} · down ${ft(m.lossFt)}</p>`;

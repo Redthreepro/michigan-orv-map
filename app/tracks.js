@@ -78,7 +78,15 @@ function saveSoon() {
   saveT = setTimeout(() => { if (rec) putTrack(rec).catch(() => {}); }, 3000);
 }
 
+// live speed for the dashboard: the phone's own GPS speed when it gives one, else from the last two fixes
+const MOVING_MS = 0.9; // slower than this counts as stopped (same as ride details)
+let live = { mph: null, at: 0, prev: null };
 window.onTrackPos = (pos) => {
+  const { latitude: la, longitude: ln, speed } = pos.coords;
+  const prev = live.prev;
+  let mps = speed != null && speed >= 0 ? speed : null;
+  if (mps == null && prev && pos.timestamp - prev.t > 0) mps = meters([prev.lat, prev.lng], [la, ln]) / ((pos.timestamp - prev.t) / 1000);
+  live = { mph: mps == null ? null : mps * 2.23694, at: Date.now(), prev: { lat: la, lng: ln, t: pos.timestamp } };
   if (!rec || rec.paused) return;
   const { latitude, longitude, accuracy, altitude } = pos.coords;
   if (accuracy > MAX_ACC_M) return;
@@ -86,6 +94,7 @@ window.onTrackPos = (pos) => {
   const seg = rec.segs[rec.segs.length - 1];
   const last = seg[seg.length - 1];
   if (last && meters(last, p) < MIN_MOVE_M) return;
+  if (last && p[3] - last[3] < 60000 && meters(last, p) / ((p[3] - last[3]) / 1000) > MOVING_MS) rec.moveMs = (rec.moveMs || 0) + (p[3] - last[3]);
   seg.push(p);
   if (recLine) recLine.addLatLng([p[0], p[1]]); else drawRec();
   saveSoon();
@@ -158,14 +167,44 @@ function refreshRecUi() {
   clearInterval(tickT);
   if (rec) tickT = setInterval(tickRec, 1000);
 }
+const DIRS8 = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+function drawDash(s) {
+  const dash = $('#ride-dash');
+  dash.hidden = !rec;
+  if (!rec) return;
+  const fresh = live.mph != null && Date.now() - live.at < 8000 && !rec.paused;
+  $('#dash-speed').textContent = rec.paused ? '–' : fresh ? Math.round(live.mph < 1 ? 0 : live.mph) : '–';
+  $('#dash-mi').textContent = s.mi < 100 ? s.mi.toFixed(1) : s.mi.toFixed(0);
+  const mm = Math.floor((rec.moveMs || 0) / 60000);
+  $('#dash-time').textContent = mm < 60 ? `${mm}m` : `${Math.floor(mm / 60)}h ${mm % 60}m`;
+  const start = window.rideStartPoint && rideStartPoint(), here = meMarker && meMarker.getLatLng();
+  if (start && here) {
+    const mi = meters(start, [here.lat, here.lng]) / 1609.344;
+    const y = Math.sin((start[1] - here.lng) * Math.PI / 180) * Math.cos(start[0] * Math.PI / 180);
+    const x = Math.cos(here.lat * Math.PI / 180) * Math.sin(start[0] * Math.PI / 180) - Math.sin(here.lat * Math.PI / 180) * Math.cos(start[0] * Math.PI / 180) * Math.cos((start[1] - here.lng) * Math.PI / 180);
+    const brg = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    $('#dash-truck').textContent = mi < 0.1 ? 'here' : mi < 10 ? mi.toFixed(1) : mi.toFixed(0);
+    $('#dash-truck-dir').textContent = mi < 0.1 ? 'truck' : `mi ${DIRS8[Math.round(brg / 45) % 8]} to truck`;
+  } else { $('#dash-truck').textContent = '–'; $('#dash-truck-dir').textContent = 'to truck'; }
+}
+// moving time for a ride already in progress (after the app reopens)
+function movingMs(t) {
+  let ms = 0;
+  for (const seg of t.segs) for (let i = 1; i < seg.length; i++) {
+    const dt = seg[i][3] - seg[i - 1][3];
+    if (dt > 0 && dt < 60000 && meters(seg[i - 1], seg[i]) / (dt / 1000) > MOVING_MS) ms += dt;
+  }
+  return ms;
+}
 function tickRec() {
-  if (!rec) { $('#rec-live').textContent = ''; return; }
+  if (!rec) { $('#rec-live').textContent = ''; drawDash(); return; }
   const s = stats(rec);
   // include time since the last fix so the clock keeps moving while stopped
   const seg = rec.segs[rec.segs.length - 1];
   const live = !rec.paused && seg.length ? Date.now() - seg[seg.length - 1][3] : 0;
   const txt = `${s.mi.toFixed(2)} mi · ${fmtDur(s.ms + Math.max(0, live))}`;
   recBar.querySelector('span').textContent = txt + (rec.paused ? ' · paused' : '');
+  drawDash(s);
   recBar.classList.toggle('paused', rec.paused);
   $('#rec-live').textContent = (rec.paused ? 'Paused. ' : 'Recording. ') + txt;
 }
@@ -249,9 +288,15 @@ const shownTracks = new Map();
 function showTrack(t, fit = true) {
   if (!shownTracks.has(t.id)) {
     const line = L.polyline(t.segs.map((s) => s.map((p) => [p[0], p[1]])), { renderer, color: TRACK_COLOR, weight: 5, opacity: 0.85 })
-      .addTo(map)
       .on('click', (e) => { L.DomEvent.stop(e); if (window.traceMode && traceMode()) return traceAdd(e.latlng); renderList(); openSheet('#panel-rides'); });
-    shownTracks.set(t.id, line);
+    const group = L.featureGroup([line]);
+    // a merged ride: a white dot where each original ride starts, so you can see where they join
+    (t.parts || []).slice(1).forEach((p) => {
+      const s = t.segs[p.from], pt = s && s[0];
+      if (pt) L.circleMarker([pt[0], pt[1]], { renderer, radius: 6, color: TRACK_COLOR, weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(group);
+    });
+    group.addTo(map);
+    shownTracks.set(t.id, group);
   }
   if (fit) map.fitBounds(shownTracks.get(t.id).getBounds(), { padding: [40, 40] });
 }
@@ -280,6 +325,7 @@ async function renderList() {
   list._rides = rides;
   if (window.refreshProgress) refreshProgress(); // ride list changed: update ride-every-trail progress
 }
+$('#btn-merge').addEventListener('click', () => window.showMergePicker && showMergePicker());
 $('#ride-list').addEventListener('click', async (e) => {
   const top = e.target.closest('.ride-top');
   if (top) {
@@ -342,6 +388,7 @@ async function shareGpx(title, xml) {
   if (open) {
     rec = open;
     rec.paused = true;
+    rec.moveMs = movingMs(rec);
     drawRec();
     toast('Your last ride is still here, paused. Hold Resume at the bottom to keep riding, or open Rides to save it.');
   }

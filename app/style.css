@@ -232,6 +232,16 @@ a { color: #6fa8ff; }
 /* big, glove-friendly buttons while a ride is recording */
 #ride-actions { position: fixed; left: 12px; right: 78px; bottom: calc(24px + var(--safe-b)); z-index: 1001; display: flex; gap: 8px; }
 #ride-actions[hidden] { display: none; }
+#ride-dash { position: fixed; left: 12px; right: 78px; bottom: calc(96px + var(--safe-b)); z-index: 1001; display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr;
+  background: var(--panel); border-radius: 14px; box-shadow: 0 2px 10px #0007; padding: 6px 4px; text-align: center; }
+#ride-dash[hidden] { display: none; }
+#ride-dash > div { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+#ride-dash > div + div { border-left: 1px solid var(--line); }
+#ride-dash b { font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#ride-dash .d-speed b { font-size: 30px; }
+#ride-dash small { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.tracing #ride-dash { display: none; }
+body.recording #update-bar { bottom: calc(168px + var(--safe-b)); }
 #ride-actions button { flex: 1; height: 64px; border: 0; border-radius: 16px; background: var(--panel); color: var(--text); box-shadow: 0 2px 10px #0007;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
 #ride-actions svg { width: 26px; height: 26px; }
@@ -354,6 +364,10 @@ body.tracing #topbar, body.tracing #chips { display: none !important; }
 .trace-dot.first::after { background: #2fbf4a; }
 .trace-dot.mid::after { inset: 11px; background: #fff; border: 3px solid #ff2fd0; opacity: 0.85; }
 .leaflet-dragging .trace-dot::after, .trace-dot.leaflet-drag-target::after { transform: scale(1.3); }
+.merge-row { align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.merge-row input { width: 22px; height: 22px; flex: none; }
+.merge-row b, .merge-row small { display: block; }
+.merge-row small { color: var(--muted); }
 .edit-sec { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .edit-sec span { flex: 1; }
 .edit-sec button { width: auto; flex: 0 0 auto; padding: 0 14px; margin: 0; }

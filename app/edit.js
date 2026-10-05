@@ -15,11 +15,13 @@ function editRide(t) {
   $('#ride-edit-body').innerHTML = `<h3>${esc(t.name)}</h3>
     <p class="hint">Forgot to start recording, or your phone died? Trace the missing part on the map. It follows the trails between your taps and gets added to this ride.</p>
     <button class="primary" data-a="add">Add a missed section</button>
-    ${manual.length ? `<h4>Added by hand</h4>${rows}<p class="hint">Fix lets you drag the dots to move the line onto the right trail.</p>` : ''}`;
+    ${manual.length ? `<h4>Added by hand</h4>${rows}<p class="hint">Fix lets you drag the dots to move the line onto the right trail.</p>` : ''}
+    ${window.mergeEditHtml ? mergeEditHtml(t) : ''}`;
   $('#ride-edit-body').onclick = async (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     const a = b.dataset.a, i = +b.dataset.i;
+    if (window.mergeEditClick && await mergeEditClick(t, a, i)) return;
     if (a === 'add') startTrace(t);
     if (a === 'fix') startTrace(t, i);
     if (a === 'del') {
@@ -44,6 +46,8 @@ function dropSeg(t, i) {
   const taps = {};
   for (const [k, v] of Object.entries(t.taps || {})) if (+k !== i) taps[+k > i ? +k - 1 : k] = v;
   t.taps = taps;
+  // a merged ride's part ranges shift down past the removed seg
+  for (const p of t.parts || []) { if (p.from > i) p.from--; if (p.to > i) p.to--; }
 }
 
 function segMeters(seg) {

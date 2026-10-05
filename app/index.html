@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=40">
+<link rel="stylesheet" href="style.css?v=41">
 </head>
 <body>
 <div id="map"></div>
@@ -70,6 +70,12 @@
 
 <div id="scale-info"></div>
 
+<div id="ride-dash" hidden>
+  <div class="d-speed"><b id="dash-speed">–</b><small>mph</small></div>
+  <div><b id="dash-mi">0.0</b><small>miles</small></div>
+  <div><b id="dash-time">0:00</b><small>moving</small></div>
+  <div><b id="dash-truck">–</b><small id="dash-truck-dir">to truck</small></div>
+</div>
 <div id="ride-actions" hidden>
   <button data-a="pause" class="ra-pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Pause</span></button>
   <button data-a="mark"><svg viewBox="0 0 24 24"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg><span>Mark</span></button>
@@ -264,6 +270,7 @@
   <p class="hint">Keep the app open on screen while you ride. Phones stop GPS for web apps when the screen is off or you switch apps. The screen stays on while recording, so plug in if you can.</p>
   <h2>Saved rides</h2>
   <div id="ride-list"></div>
+  <button class="ghost" id="btn-merge">Merge rides</button>
   <button class="ghost" id="btn-trace-new">Trace a ride by hand</button>
   <button class="ghost btn-import">Import GPX (rides, waypoints, a shared trip)</button>
 </section>
@@ -305,21 +312,22 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=40"></script>
-<script src="tracks.js?v=40"></script>
-<script src="routing.js?v=40"></script>
-<script src="places.js?v=40"></script>
-<script src="plan.js?v=40"></script>
-<script src="nav.js?v=40"></script>
-<script src="offline.js?v=40"></script>
-<script src="gpx.js?v=40"></script>
-<script src="weather.js?v=40"></script>
-<script src="progress.js?v=40"></script>
-<script src="details.js?v=40"></script>
-<script src="edit.js?v=40"></script>
-<script src="select.js?v=40"></script>
-<script src="updates.js?v=40"></script>
-<script src="laws.js?v=40"></script>
-<script src="safety.js?v=40"></script>
+<script src="app.js?v=41"></script>
+<script src="tracks.js?v=41"></script>
+<script src="routing.js?v=41"></script>
+<script src="places.js?v=41"></script>
+<script src="plan.js?v=41"></script>
+<script src="nav.js?v=41"></script>
+<script src="offline.js?v=41"></script>
+<script src="gpx.js?v=41"></script>
+<script src="weather.js?v=41"></script>
+<script src="progress.js?v=41"></script>
+<script src="details.js?v=41"></script>
+<script src="edit.js?v=41"></script>
+<script src="select.js?v=41"></script>
+<script src="updates.js?v=41"></script>
+<script src="laws.js?v=41"></script>
+<script src="safety.js?v=41"></script>
+<script src="merge.js?v=41"></script>
 </body>
 </html>
