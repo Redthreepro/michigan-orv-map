@@ -46,6 +46,19 @@ service cloud.firestore {
         allow create: if isMember() && request.resource.data.by == request.auth.uid;
         allow update, delete: if isMember();
       }
+      // report photos, shrunk on the phone and stored as text (keeps the project on the free plan)
+      match /photos/{pid} {
+        allow read: if isMember();
+        allow create: if isMember() && request.resource.data.by == request.auth.uid
+          && request.resource.data.d is string && request.resource.data.d.size() < 600000;
+        allow delete: if isMember();
+      }
+      // planned rides shared with the crew; only the person who shared one can change or remove it
+      match /trips/{tid} {
+        allow read: if isMember();
+        allow create: if isMember() && request.resource.data.by == request.auth.uid;
+        allow update, delete: if isMember() && resource.data.by == request.auth.uid;
+      }
     }
 
     // everything else stays locked

@@ -71,7 +71,7 @@ document.addEventListener('click', async (e) => {
   const b = e.target.closest('.photo-thumb');
   if (!b) return;
   e.stopPropagation();
-  const u = await photoUrl(b.dataset.photo, false);
+  const u = b.dataset.src || (b.dataset.photo && await photoUrl(b.dataset.photo, false));
   if (!u) return;
   const v = $('#photo-view');
   v.querySelector('img').src = u;
@@ -178,7 +178,10 @@ window.spotExtras = (wp) => {
   return html;
 };
 window.spotClick = async (wp, a) => {
-  if (a === 'photo') { if (await addPhotoTo(wp)) showPlace({ lat: wp.lat, lng: wp.lng, n: wp.name }, wp); return true; }
+  if (a === 'photo') {
+    if (await addPhotoTo(wp)) { if (window.cloudReport) cloudReport(wp); showPlace({ lat: wp.lat, lng: wp.lng, n: wp.name }, wp); }
+    return true;
+  }
   if (a === 'cleared') {
     if (window.cloudReportGone) cloudReportGone(wp);
     await dropPhotos(wp);

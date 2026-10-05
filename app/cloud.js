@@ -144,6 +144,8 @@ async function cloudClick(e) {
     if (a === 'crew-create') await createCrew();
     if (a === 'crew-join') await joinCrew();
     if (a === 'crew-send') await sendCrewCode();
+    if (a === 'trip-load') return loadCrewTrip(C.trips.find((t) => t.id === b.dataset.id));
+    if (a === 'trip-del') { const t = C.trips.find((x) => x.id === b.dataset.id); if (t && confirm(`Remove "${t.name}" for the whole crew?`)) await fb.db.collection('crews').doc(C.code).collection('trips').doc(t.id).delete(); }
     if (a === 'crew-leave') { if (confirm('Leave this crew? Your rides stay on your phone.')) await leaveCrew(); }
   } catch (err) { toast(cloudErr(err)); }
   showCloud();
@@ -276,7 +278,7 @@ window.cloudPlanChanged = () => { if (W.active && fb) fb.db.collection('watch').
 window.watchShared = () => !!W.id;
 
 // ---------- crews ----------
-const C = { code: store.get('crew', null), doc: null, ridden: new Map(), reports: [], unsub: [], upKey: '' };
+const C = { code: store.get('crew', null), doc: null, ridden: new Map(), reports: [], trips: [], unsub: [], upKey: '' };
 function crewHtml() {
   let h = '<h2>Crew</h2>';
   if (!C.code) {
@@ -290,6 +292,7 @@ function crewHtml() {
     ${cs ? `<p class="hint">Together: ${fmtMi(cs.riddenM)} of ${fmtMi(cs.totalM)} ridden (${fmtPct(pct(cs.riddenM, cs.totalM))})</p>` : ''}
     <ul class="along">${members.map(([uid, n]) => { const r = C.ridden.get(uid); return `<li><b>${esc(n)}${me && uid === me.uid ? ' (you)' : ''}</b><small>${r && r.mi != null ? fmtMi(r.mi * 1609.344) + ' ridden' : 'no rides shared yet'}</small></li>`; }).join('')}</ul>
     <label class="row"><input type="checkbox" id="cl-crewmap" ${shown.crew ? 'checked' : ''}> Show the crew's ridden trails on the map (teal)</label>
+    ${crewTripsHtml()}
     <div class="rec-row"><button class="ghost" data-a="crew-send">Send the code</button><button class="ghost danger" data-a="crew-leave">Leave crew</button></div>`;
   return h;
 }
@@ -320,8 +323,8 @@ async function leaveCrew() {
     await fb.db.collection('crews').doc(code).collection('ridden').doc(me.uid).delete();
     await fb.db.collection('crews').doc(code).update({ ['members.' + me.uid]: fb.FV.delete() });
   } catch {}
-  C.code = null; store.set('crew', null); C.doc = null; C.ridden.clear(); C.reports = [];
-  drawCrew(); drawCrewReports();
+  C.code = null; store.set('crew', null); C.doc = null; C.ridden.clear(); C.reports = []; C.trips = [];
+  drawCrew(); drawCrewReports(); refreshTripChip();
 }
 async function sendCrewCode() {
   const text = `Join my ORV crew "${C.doc ? C.doc.name : ''}" in the Michigan ORV Map app (Layers → Crew & Ride Watch → Join with a code). Code: ${C.code}  ${new URL('./', location.href).href}`;
@@ -353,6 +356,12 @@ function startCrew() {
     C.reports = [];
     q.forEach((d) => C.reports.push({ id: d.id, ...d.data() }));
     drawCrewReports();
+  }, () => {}));
+  C.unsub.push(ref.collection('trips').onSnapshot((q) => {
+    C.trips = [];
+    q.forEach((d) => C.trips.push({ id: d.id, ...d.data() }));
+    C.trips.sort((a, b) => b.at - a.at);
+    refreshTripChip(); refreshCloudSheet();
   }, () => {}));
   uploadRidden();
 }
@@ -439,6 +448,49 @@ if (shown.crew === undefined) shown.crew = 1;
 const crewBox = document.querySelector('[data-kind="crew"]');
 if (crewBox) { crewBox.checked = !!shown.crew; crewBox.addEventListener('change', drawCrew); }
 
+// ---------- planned rides shared with the crew ----------
+function crewTripsHtml() {
+  store.set('tripsSeen', Date.now()); // looking at the list counts as seeing new ones
+  setTimeout(refreshTripChip, 0);
+  if (!C.trips.length) return '<h2>Crew rides</h2><p class="hint">Plan a trip (or pick the part you\'ll ride and make it a trip), then tap "Share with my crew" on the trip.</p>';
+  return '<h2>Crew rides</h2><ul class="along">' + C.trips.map((t) => `<li><b>${esc(t.name)}</b>
+      <small>${t.when ? esc(t.when) + ' · ' : ''}${t.mi ? t.mi.toFixed(1) + ' mi · ' : ''}${(t.stops || []).length} stops · shared by ${esc(me && t.by === me.uid ? 'you' : t.byName || 'crew')}</small>
+      ${t.note ? `<small>${esc(t.note)}</small>` : ''}
+      <div class="rec-row"><button class="ghost" data-a="trip-load" data-id="${esc(t.id)}">Load this ride</button>${me && t.by === me.uid ? `<button class="ghost danger" data-a="trip-del" data-id="${esc(t.id)}">Remove</button>` : ''}</div></li>`).join('') + '</ul>';
+}
+window.crewCode = () => (C.code && me ? C.code : null);
+window.shareTripToCrew = async () => {
+  if (!C.code || !me) return toast('Join or start a crew first (Layers → Crew & Ride Watch).');
+  if (typeof plan === 'undefined' || !plan || plan.stops.length < 2) return toast('Plan a trip first');
+  const stops = plan.stops.map((s) => ({ lat: +(+s.lat).toFixed(6), lng: +(+s.lng).toFixed(6), name: s.mine ? 'Start' : (s.name || 'Stop'), night: !!s.night }));
+  const first = stops[0].name, last = stops[stops.length - 1].name;
+  const name = prompt('Name this ride for the crew', `${first} to ${last}`);
+  if (name === null) return;
+  const when = prompt('When? (optional, e.g. "Sat 9 AM at the Baldwin trailhead")', '') || '';
+  const mi = planLegs.reduce((s, r) => s + (r.meters || 0), 0) / 1609.344;
+  await fb.db.collection('crews').doc(C.code).collection('trips').add({ name: (name.trim() || 'Crew ride').slice(0, 80), when: when.trim().slice(0, 120),
+    stops, mi: +mi.toFixed(1), by: me.uid, byName: myName(), at: Date.now() });
+  toast('Shared with your crew');
+};
+async function loadCrewTrip(t) {
+  if (!t) return;
+  if (plan && plan.stops.length > 1 && !confirm(`Replace your planned trip with "${t.name}"?`)) return;
+  plan = { stops: t.stops.map((s) => ({ lat: s.lat, lng: s.lng, name: s.name, night: !!s.night })) };
+  savePlan();
+  closeSheets();
+  computePlan();
+  toast(`Loaded "${t.name}"`);
+}
+// someone shared a ride you haven't seen yet
+function refreshTripChip() {
+  const bar = $('#crewtrip-bar');
+  const seen = store.get('tripsSeen', 0);
+  const fresh = C.code && me ? C.trips.filter((t) => t.by !== me.uid && t.at > seen) : [];
+  bar.hidden = !fresh.length;
+  if (fresh.length) bar.querySelector('span').textContent = fresh.length === 1 ? `${fresh[0].byName || 'Crew'} shared a ride: ${fresh[0].name}` : `${fresh.length} new crew rides`;
+}
+$('#crewtrip-bar').addEventListener('click', showCloud);
+
 // ---------- shared trail reports ----------
 const crewReportLayer = L.layerGroup().addTo(map);
 function drawCrewReports() {
@@ -457,23 +509,58 @@ function showCrewReport(r) {
   $('#sheet-body').innerHTML = `<h3>${esc(label)}</h3><span class="tag kind">Crew report</span>
     <p class="hint">Reported by ${esc(r.byName || 'a crew member')} ${days < 1 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'}.</p>
     ${r.note ? `<div class="note">${esc(r.note)}</div>` : ''}
+    ${(r.photos || []).length ? `<div class="photo-strip">${r.photos.map((id) => `<button class="photo-thumb" data-crew="${esc(id)}" data-cap="${esc(label)}" aria-label="Open photo"></button>`).join('')}</div>` : ''}
     <div class="rec-row"><button class="ghost" data-a="save">Save to my waypoints</button><button class="ghost" data-a="cleared">It's cleared</button></div>`;
+  const crewRef = fb.db.collection('crews').doc(C.code);
+  const shots = {};
+  for (const b of $('#sheet-body').querySelectorAll('[data-crew]')) {
+    crewRef.collection('photos').doc(b.dataset.crew).get().then((s) => {
+      if (!s.exists) return b.remove();
+      shots[b.dataset.crew] = s.data().d;
+      b.dataset.src = s.data().d;
+      b.style.backgroundImage = `url("${s.data().d}")`; b.classList.add('ready');
+    }).catch(() => b.remove());
+  }
   $('#sheet-body').onclick = async (e) => {
     const a = e.target.closest('button')?.dataset.a;
-    if (a === 'save') { await tx('readwrite', (s) => s.put({ id: 'w' + Date.now(), lat: r.lat, lng: r.lng, name: label, type: 'report', r: r.r, at: r.at, note: r.note || '' }), 'waypoints'); await loadWaypoints(); closeSheets(); toast('Saved'); }
-    if (a === 'cleared') { await fb.db.collection('crews').doc(C.code).collection('reports').doc(r.id).delete().catch(() => {}); closeSheets(); toast('Removed for the whole crew'); }
+    if (a === 'save') {
+      // keep a copy of the photos on this phone too
+      const photos = [];
+      for (const [id, d] of Object.entries(shots)) { const blob = await (await fetch(d)).blob(); await putPhoto({ id, blob, thumb: blob, at: Date.now() }); photos.push(id); }
+      await tx('readwrite', (s) => s.put({ id: 'w' + Date.now(), lat: r.lat, lng: r.lng, name: label, type: 'report', r: r.r, at: r.at, note: r.note || '', photos }), 'waypoints');
+      await loadWaypoints(); closeSheets(); toast('Saved');
+    }
+    if (a === 'cleared') {
+      for (const id of r.photos || []) crewRef.collection('photos').doc(id).delete().catch(() => {});
+      await crewRef.collection('reports').doc(r.id).delete().catch(() => {});
+      closeSheets(); toast('Removed for the whole crew');
+    }
   };
   openSheet('#sheet');
 }
 // my reports -> the crew (and removing one clears it for everyone)
+const CREW_PHOTO_MAX = 3;    // photos shared per report
+const toDataUrl = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
 window.cloudReport = async (wp) => {
   if (!C.code || !me || !fb || wp.type !== 'report') return;
-  const ref = fb.db.collection('crews').doc(C.code).collection('reports').doc(wp.id);
-  ref.set({ lat: wp.lat, lng: wp.lng, r: wp.r || 'hazard', name: wp.name, note: wp.note || '', at: wp.at || Date.now(), by: me.uid, byName: myName() }).catch(() => {});
+  const crew = fb.db.collection('crews').doc(C.code);
+  const ids = (wp.photos || []).slice(0, CREW_PHOTO_MAX);
+  for (const id of ids) {
+    try {
+      const p = await getPhoto(id);
+      if (!p) continue;
+      const small = await shrink(p.blob, 800, 0.6); // ~60-120 KB: small enough for the free database
+      crew.collection('photos').doc(id).set({ d: await toDataUrl(small), by: me.uid, at: Date.now(), rep: wp.id }).catch(() => {});
+    } catch {}
+  }
+  crew.collection('reports').doc(wp.id).set({ lat: wp.lat, lng: wp.lng, r: wp.r || 'hazard', name: wp.name, note: wp.note || '', at: wp.at || Date.now(),
+    by: me.uid, byName: myName(), photos: ids }).catch(() => {});
 };
 window.cloudReportGone = (wp) => {
   if (!C.code || !me || !fb || wp.type !== 'report') return;
-  fb.db.collection('crews').doc(C.code).collection('reports').doc(wp.id).delete().catch(() => {});
+  const crew = fb.db.collection('crews').doc(C.code);
+  for (const id of wp.photos || []) crew.collection('photos').doc(id).delete().catch(() => {});
+  crew.collection('reports').doc(wp.id).delete().catch(() => {});
 };
 
 $('#btn-cloud').addEventListener('click', showCloud);

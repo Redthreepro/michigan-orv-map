@@ -295,6 +295,7 @@ function showPlan() {
   let html = `<h3>${n < 2 ? 'Trip' : isTrip ? 'Trip' : 'Route'}${n >= 2 ? ': ' + fmtMi(t.m) : ''}</h3>`;
   if (n < 2) html += `<p class="hint">Add another stop: long-press the map, or tap a gas station, campground, waypoint, or trail and choose "Add to trip".</p>`;
   else html += `<p class="hint">About ${tripTime(t.m)} of riding at ${RIDE_MPH[0]}–${RIDE_MPH[1]} mph${rig ? ` · for your ${machineName()}` : ''}${window.sunsetText ? ` · sunset today ${sunsetText()}` : ''}</p>`;
+  if (n >= 2) html += `<div class="rec-row"><button class="ghost" id="btn-plan-checkin">Tell someone your plan</button>${window.crewCode && crewCode() ? '<button class="ghost" id="btn-plan-crew">Share with my crew</button>' : ''}</div>`;
 
   const gasList = planLegs.length ? alongTrip('gas', GAS_NEAR_M) : [];
   const warns = planLegs.length ? tripWarnings(gasList) : [];
@@ -362,7 +363,6 @@ function showPlan() {
   }
   html += '<div id="trip-weather"></div>';
   html += `<p class="hint">Routes use DNR data only and skip closed segments. Always follow posted signs.</p>`;
-  if (n >= 2) html += `<button class="ghost" id="btn-plan-checkin">Tell someone your plan</button>`;
   html += `<div class="rec-row"><button class="ghost" id="btn-plan-gpx">Share GPX</button><button class="ghost" id="btn-plan-clear">Clear</button></div>`;
   $('#route-body').innerHTML = html;
   openSheet('#panel-route');
@@ -373,6 +373,7 @@ $('#route-body').addEventListener('click', async (e) => {
   const btn = e.target.closest('button');
   const li = e.target.closest('li');
   if (btn && btn.id === 'btn-plan-checkin') return showCheckin();
+  if (btn && btn.id === 'btn-plan-crew') return window.shareTripToCrew && shareTripToCrew();
   if (btn && btn.id === 'btn-plan-clear') {
     if (plan && plan.stops.length > 2 && !confirm('Clear this whole trip?')) return;
     return clearPlan();
