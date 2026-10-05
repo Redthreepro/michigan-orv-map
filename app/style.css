@@ -290,6 +290,15 @@ body.navigating #chips { top: calc(150px + var(--safe-t)); }
 .trace-btns button { flex: 1; height: 40px; margin: 0; }
 .primary.small { height: 40px; margin: 0; }
 body.tracing #topbar, body.tracing #chips { display: none !important; }
+/* draggable dots: a 34px touch target around a smaller visible dot */
+.trace-dot { background: none; border: 0; }
+.trace-dot::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: #ff2fd0; border: 3px solid #fff; box-shadow: 0 1px 4px #0008; }
+.trace-dot.first::after { background: #2fbf4a; }
+.trace-dot.mid::after { inset: 11px; background: #fff; border: 3px solid #ff2fd0; opacity: 0.85; }
+.leaflet-dragging .trace-dot::after, .trace-dot.leaflet-drag-target::after { transform: scale(1.3); }
+.edit-sec { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.edit-sec span { flex: 1; }
+.edit-sec button { width: auto; flex: 0 0 auto; padding: 0 14px; margin: 0; }
 
 .goal-card .goal-bonus { margin-top: 2px; color: #d9c27a; }
 .goal-list.bonus li { cursor: default; }
