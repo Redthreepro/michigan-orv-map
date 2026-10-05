@@ -27,6 +27,11 @@ function editRide(t) {
     if (a === 'del') {
       if (!confirm(`Delete this ${fmtMi(segMeters(t.segs[i]))} section? The recorded part stays.`)) return;
       dropSeg(t, i);
+      // a ride traced entirely by hand has nothing left: remove the empty ride
+      if (!t.segs.length) {
+        hideTrack(t.id); await delTrack(t.id); closeSheets(); renderList(); toast('Ride deleted (nothing left in it)');
+        return;
+      }
       await putTrack(t);
       refreshShownTrack(t);
       renderList();
@@ -87,7 +92,8 @@ async function startTrace(ride, fix = null, pick = null) {
     // show the ride without the section being fixed; the section comes back as draggable dots
     hideTrack(ride.id);
     showTrack({ ...ride, segs: ride.segs.filter((_, i) => i !== fix) }, false);
-    trace.pts = (ride.taps && ride.taps[fix]) || dotsFromSeg(ride.segs[fix]);
+    // a copy: dragging dots must not touch the saved ones unless you tap Save
+    trace.pts = ((ride.taps && ride.taps[fix]) || dotsFromSeg(ride.segs[fix])).map((p) => p.slice());
     for (let i = 1; i < trace.pts.length; i++) trace.legs.push(traceLeg(trace.pts[i - 1], trace.pts[i]));
     map.fitBounds(L.latLngBounds(ride.segs[fix].map((p) => [p[0], p[1]])), { padding: [60, 60] });
   } else if (ride) {

@@ -68,7 +68,7 @@ let rig = store.get('rig', 0);
 // what you ride -> the narrowest DNR trail class it fits (dirt bikes are legal on every ORV class: 24")
 const MACHINES = { 24: 'dirt bike', 50: 'ATV (50" or less)', 64: 'side-by-side (51–64")', 72: 'side-by-side (65–72")' };
 const machineName = (v = rig) => MACHINES[v] || `machine up to ${v}"`;
-if (![0, 50, 64, 72].includes(rig)) rig = 0; // old "Full-size" option was removed
+if (![0, 24, 50, 64, 72].includes(rig)) rig = 0; // old "Full-size" option was removed
 
 // p.lim = widest machine (inches) the DNR trail class legally allows; set by build.py
 function fits(p) {
@@ -224,7 +224,7 @@ function buildRoadCells(features) {
   }
 }
 function updateRoads() {
-  if (!map.hasLayer(layers.road)) return;
+  if (!layers.road || !map.hasLayer(layers.road)) return; // the map can move before the trails have loaded
   const view = map.getBounds().pad(0.25);
   for (const c of roadCells) {
     const want = view.intersects(c.bounds);
@@ -293,7 +293,7 @@ document.querySelectorAll('.sheet .close').forEach((b) => b.addEventListener('cl
 for (const pane of ['roads', 'plan']) map.getPane(pane).style.pointerEvents = 'none';
 function roadAt(layerPoint) {
   let hit = null;
-  if (!map.hasLayer(layers.road)) return null;
+  if (!layers.road || !map.hasLayer(layers.road)) return null;
   layers.road.eachLayer((cell) => cell.eachLayer((l) => { if (!hit && l._containsPoint && l._containsPoint(layerPoint)) hit = l; }));
   return hit;
 }
@@ -483,15 +483,15 @@ rangeInput.addEventListener('change', () => {
 
 // Layers panel: remember which groups are open and show "N of M on" on each group
 function updateGroupCounts() {
-  document.querySelectorAll('.grp').forEach((g) => {
+  document.querySelectorAll('#panel-layers .grp').forEach((g) => {
     const boxes = [...g.querySelectorAll('input[type=checkbox]')];
     g.querySelector('.grp-count').textContent = `${boxes.filter((b) => b.checked).length} of ${boxes.length} on`;
   });
 }
 const openGroups = store.get('openGroups', []);
-document.querySelectorAll('.grp').forEach((g) => {
+document.querySelectorAll('#panel-layers .grp').forEach((g) => {
   g.open = openGroups.includes(g.dataset.grp);
-  g.addEventListener('toggle', () => store.set('openGroups', [...document.querySelectorAll('.grp[open]')].map((x) => x.dataset.grp)));
+  g.addEventListener('toggle', () => store.set('openGroups', [...document.querySelectorAll('#panel-layers .grp[open]')].map((x) => x.dataset.grp)));
   g.addEventListener('change', updateGroupCounts);
 });
 updateGroupCounts();

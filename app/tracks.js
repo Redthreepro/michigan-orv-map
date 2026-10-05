@@ -131,6 +131,7 @@ async function stopRec() {
   rec.paused = false;
   if (!rec.segs.length || s.mi < 0.01) {
     if (!confirm('This ride has almost no distance. Save it anyway?')) {
+      $('#photo-bar').hidden = true;
       await delTrack(rec.id); rec = null; drawRec(); unlockScreen(); refreshRecUi(); renderList(); return;
     }
   }
@@ -297,7 +298,8 @@ function showTrack(t, fit = true) {
     group.addTo(map);
     shownTracks.set(t.id, group);
   }
-  if (fit) map.fitBounds(shownTracks.get(t.id).getBounds(), { padding: [40, 40] });
+  const b = shownTracks.get(t.id).getBounds();
+  if (fit && b.isValid()) map.fitBounds(b, { padding: [40, 40] });
 }
 function hideTrack(id) {
   const l = shownTracks.get(id);

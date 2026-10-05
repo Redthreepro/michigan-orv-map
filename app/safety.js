@@ -219,11 +219,16 @@ function showCheckin() {
     const note = $('#ci-note').value.trim();
     const text = `ORV ride plan: ${what ? what + '. ' : ''}Starting near ${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}${near ? ` (${near})` : ''}.${note ? ' ' + note + '.' : ''}
 Back by ${when(back)}. If you haven't heard from me by ${when(worry)}, call 911 and give them this location: https://www.google.com/maps/search/?api=1&query=${at.lat.toFixed(5)},${at.lng.toFixed(5)}`;
+    let sent = false;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'My ride plan', text }); sent = true; } catch (err) { if (err.name === 'AbortError') return; }
+    }
+    if (!sent) {
+      try { await navigator.clipboard.writeText(text); } catch { if (prompt('Copy your plan, then paste it in a text:', text) === null) return; }
+    }
     store.set('checkin', { back: back.getTime() });
-    if (navigator.share) { try { await navigator.share({ title: 'My ride plan', text }); } catch (err) { if (err.name === 'AbortError') return; } }
-    else { try { await navigator.clipboard.writeText(text); toast('Plan copied. Paste it in a text.'); } catch { prompt('Copy your plan:', text); } }
     closeSheets();
-    toast(`Got it. I'll remind you at ${when(back)} to check in.`);
+    toast(sent ? `Got it. I'll remind you at ${when(back)} to check in.` : `Plan copied: paste it in a text to them. I'll remind you at ${when(back)} to check in.`);
     checkinCheck();
   };
   openSheet('#sheet');

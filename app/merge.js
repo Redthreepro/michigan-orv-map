@@ -133,6 +133,14 @@ async function splitAt(t, cutTime) {
   b.name = `${t.name} (${overnight ? 'day 2' : 'part 2'})`.slice(0, 80);
   a.camps = (t.camps || []).filter((c) => c.t < cutTime); b.camps = (t.camps || []).filter((c) => c.t >= cutTime);
   for (const r of [a, b]) { if (!r.camps.length) delete r.camps; if (!Object.keys(r.taps).length) delete r.taps; }
+  // photos/marks tagged with this ride (or the rides merged into it) go with the half they were taken in
+  const rideIds = new Set([t.id, ...(t.parts || []).map((p) => p.meta.id)]);
+  for (const w of (typeof waypoints !== 'undefined' ? waypoints : [])) {
+    if (!rideIds.has(w.rideId)) continue;
+    const ts = +String(w.id).slice(1) || 0; // waypoint ids are 'w' + the time they were made
+    w.rideId = ts && ts >= cutTime ? b.id : a.id;
+    await tx('readwrite', (s) => s.put(w), 'waypoints');
+  }
   hideTrack(t.id);
   await putTrack(a); await putTrack(b);
   closeSheets();
