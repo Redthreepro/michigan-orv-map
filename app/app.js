@@ -65,6 +65,9 @@ map.on('moveend', () => {
 
 // ---------- width fit ----------
 let rig = store.get('rig', 0);
+// what you ride -> the narrowest DNR trail class it fits (dirt bikes are legal on every ORV class: 24")
+const MACHINES = { 24: 'dirt bike', 50: 'ATV (50" or less)', 64: 'side-by-side (51–64")', 72: 'side-by-side (65–72")' };
+const machineName = (v = rig) => MACHINES[v] || `machine up to ${v}"`;
 if (![0, 50, 64, 72].includes(rig)) rig = 0; // old "Full-size" option was removed
 
 // p.lim = widest machine (inches) the DNR trail class legally allows; set by build.py

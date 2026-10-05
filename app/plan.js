@@ -289,7 +289,7 @@ function showPlan() {
   const isTrip = n > 2 || plan.stops.some((s) => s.night);
   let html = `<h3>${n < 2 ? 'Trip' : isTrip ? 'Trip' : 'Route'}${n >= 2 ? ': ' + fmtMi(t.m) : ''}</h3>`;
   if (n < 2) html += `<p class="hint">Add another stop: long-press the map, or tap a gas station, campground, waypoint, or trail and choose "Add to trip".</p>`;
-  else html += `<p class="hint">About ${tripTime(t.m)} of riding at ${RIDE_MPH[0]}–${RIDE_MPH[1]} mph${rig ? ` · for machines up to ${rig}"` : ''}</p>`;
+  else html += `<p class="hint">About ${tripTime(t.m)} of riding at ${RIDE_MPH[0]}–${RIDE_MPH[1]} mph${rig ? ` · for your ${machineName()}` : ''}</p>`;
 
   const gasList = planLegs.length ? alongTrip('gas', GAS_NEAR_M) : [];
   const warns = planLegs.length ? tripWarnings(gasList) : [];

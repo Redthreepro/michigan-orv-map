@@ -250,7 +250,7 @@ function renderGoalCard() {
   const p = pct(s.riddenM, s.totalM);
   el.innerHTML = `<div class="goal-top"><b>Ride every trail in Michigan</b><span>${fmtPct(p)}</span></div>
     <div class="goal-bar"><span style="width:${p.toFixed(2)}%"></span></div>
-    <small>${fmtMi(s.riddenM)} of ${fmtMi(s.totalM)} ridden · ${s.started.length} of ${s.list.length} trails &amp; routes started${rig ? ` · for machines up to ${rig}"` : ''}</small>
+    <small>${fmtMi(s.riddenM)} of ${fmtMi(s.totalM)} ridden · ${s.started.length} of ${s.list.length} trails &amp; routes started${rig ? ` · for your ${machineName()}` : ''}</small>
     ${(() => { const r = roadSummary(); return r.loaded ? `<small class="goal-bonus">Bonus: ${fmtMi(r.riddenM)} of ${fmtMi(r.totalM)} of forest roads</small>` : ''; })()}`;
 }
 function showGoal() {
@@ -262,7 +262,7 @@ function showGoal() {
   let html = `<h3>Ride every trail in Michigan</h3>
     <div class="goal-big">${fmtPct(p)}</div>
     <div class="goal-bar big"><span style="width:${p.toFixed(2)}%"></span></div>
-    <p class="hint">${fmtMi(s.riddenM)} of ${fmtMi(s.totalM)} of DNR ORV routes and trails${rig ? ` your ${rig === 50 ? '50"' : rig + '"'} machine can ride` : ''}.
+    <p class="hint">${fmtMi(s.riddenM)} of ${fmtMi(s.totalM)} of DNR ORV routes and trails${rig ? ` your ${machineName()} can ride` : ''}.
       ${s.done.length} done, ${s.started.length} started, ${notYet.length} to go. Built from ${progress ? progress.rides.length : 0} saved ride${progress && progress.rides.length === 1 ? '' : 's'}.</p>`;
   if (started.length) {
     html += '<h2>Started</h2><ul class="goal-list">' + started.map((x, i) => {

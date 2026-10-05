@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
 <div id="map"></div>
@@ -85,11 +85,12 @@
   <button class="close" aria-label="Close">&times;</button>
   <button id="btn-updates" class="ghost">DNR trail updates (last 60 days)</button>
   <h2>My machine</h2>
-  <div class="seg" id="rig-seg">
-    <button data-rig="0" class="on">Show all</button>
-    <button data-rig="50">50" or less</button>
-    <button data-rig="64">51–64"</button>
-    <button data-rig="72">65–72"</button>
+  <div class="seg machines" id="rig-seg">
+    <button data-rig="24">Dirt bike</button>
+    <button data-rig="50">ATV (50" or less)</button>
+    <button data-rig="64">Side-by-side 51–64"</button>
+    <button data-rig="72">Side-by-side 65–72"</button>
+    <button data-rig="0" class="all">Show everything</button>
   </div>
   <label class="row">Fuel range
     <input id="fuel-range" class="field range-field" type="number" inputmode="numeric" min="5" max="600" placeholder="miles">
@@ -268,11 +269,12 @@
   <h3>Michigan ORV Map</h3>
   <p class="hint">Every DNR ORV route, trail, forest road and closure, plus national forest roads. Works with no signal.</p>
   <h2>What do you ride?</h2>
-  <div class="seg" id="welcome-rig">
-    <button data-rig="50">ATV / 50" or less</button>
-    <button data-rig="64">SxS 51–64"</button>
-    <button data-rig="72">SxS 65–72"</button>
-    <button data-rig="0">Show everything</button>
+  <div class="seg machines" id="welcome-rig">
+    <button data-rig="24">Dirt bike</button>
+    <button data-rig="50">ATV (50" or less)</button>
+    <button data-rig="64">Side-by-side 51–64"</button>
+    <button data-rig="72">Side-by-side 65–72"</button>
+    <button data-rig="0" class="all">Show everything</button>
   </div>
   <p class="hint">Hides anything your machine isn't legally allowed on. Change it any time in Layers.</p>
   <label class="row">Fuel range (optional)
@@ -298,19 +300,19 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=38"></script>
-<script src="tracks.js?v=38"></script>
-<script src="routing.js?v=38"></script>
-<script src="places.js?v=38"></script>
-<script src="plan.js?v=38"></script>
-<script src="nav.js?v=38"></script>
-<script src="offline.js?v=38"></script>
-<script src="gpx.js?v=38"></script>
-<script src="weather.js?v=38"></script>
-<script src="progress.js?v=38"></script>
-<script src="details.js?v=38"></script>
-<script src="edit.js?v=38"></script>
-<script src="select.js?v=38"></script>
-<script src="updates.js?v=38"></script>
+<script src="app.js?v=39"></script>
+<script src="tracks.js?v=39"></script>
+<script src="routing.js?v=39"></script>
+<script src="places.js?v=39"></script>
+<script src="plan.js?v=39"></script>
+<script src="nav.js?v=39"></script>
+<script src="offline.js?v=39"></script>
+<script src="gpx.js?v=39"></script>
+<script src="weather.js?v=39"></script>
+<script src="progress.js?v=39"></script>
+<script src="details.js?v=39"></script>
+<script src="edit.js?v=39"></script>
+<script src="select.js?v=39"></script>
+<script src="updates.js?v=39"></script>
 </body>
 </html>
