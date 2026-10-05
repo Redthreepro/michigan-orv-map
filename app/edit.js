@@ -60,31 +60,41 @@ function endTrace() {
   $('#trace-bar').hidden = true;
 }
 
-// One leg between two taps. Only snaps to a trail/road right where you tapped (~250 ft); follows the
-// network only when it connects without a big detour; otherwise a straight line between your taps.
-const TRACE_SNAP_M = 75;
-const TRACE_DETOUR = 2.5;   // a trail path longer than 2.5x the straight distance (+~1/2 mi) is a wrong guess
+// One leg between two taps. Snaps to a trail/road within a fingertip of where you tapped (scales with zoom,
+// so a sloppy tap zoomed out still works, but never jumps to a trail miles away); follows the network only
+// when it connects without a big detour; otherwise a straight line between your taps.
+const TRACE_SNAP_PX = 35;
+const TRACE_DETOUR = 4;     // a trail path longer than 4x the straight distance (+~1 mi) is a wrong guess
+function traceSnapM() {
+  const mpp = 40075016 * Math.cos(map.getCenter().lat * Math.PI / 180) / Math.pow(2, map.getZoom() + 8);
+  return Math.min(800, Math.max(60, TRACE_SNAP_PX * mpp));
+}
 function traceLeg(a, b) {
   const straight = { coords: [a, b], straight: true };
   const direct = hav(a[0], a[1], b[0], b[1]);
+  const snap = traceSnapM();
   ROUTE_ANY = true;
   try {
     const S = candidates(a[0], a[1], 0)[0], T = candidates(b[0], b[1], 0)[0];
-    if (!S || !T || S.d > TRACE_SNAP_M || T.d > TRACE_SNAP_M) return straight;
+    if (!S || !T || S.d > snap || T.d > snap) return straight;
     const sol = solve(S, T);
     if (!sol.endVia) return straight;
     const path = assemble(S, T, sol).flatMap((l) => l.coords);
     let len = 0;
     for (let i = 1; i < path.length; i++) len += hav(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
-    if (len > direct * TRACE_DETOUR + 800) return straight;
-    return { coords: [a, ...path, b] };
+    if (len > direct * TRACE_DETOUR + 1600) return straight;
+    return { coords: path }; // starts and ends on the trail, not out where your finger landed
   } finally {
     ROUTE_ANY = false;
   }
 }
 window.traceAdd = (latlng) => {
   const p = [latlng.lat, latlng.lng];
-  if (trace.pts.length) trace.legs.push(traceLeg(trace.pts[trace.pts.length - 1], p));
+  if (trace.pts.length) {
+    const leg = traceLeg(trace.pts[trace.pts.length - 1], p);
+    trace.legs.push(leg);
+    if (leg.straight) toast('No trail between those taps, so it drew a straight line. Undo and tap right on the trail to follow it.');
+  }
   trace.pts.push(p);
   drawTrace();
 };
