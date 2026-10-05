@@ -172,6 +172,9 @@ function showSOS() {
     html += `<h2>Nearest hospital</h2><div class="sos-hosp"><b>${esc(hosp.p.n)}</b><small>${hosp.mi.toFixed(0)} mi away${hosp.p.city ? ` · ${esc(hosp.p.city)}` : ''}${hosp.p.er ? ' · emergency room' : ''}</small></div>
       <div class="rec-row"><button class="ghost" data-a="hosp-go">Directions</button>${hosp.p.ph ? `<a class="btn ghost" href="tel:${esc(hosp.p.ph.replace(/[^\d+]/g, ''))}">Call</a>` : ''}</div>`;
   }
+  if (window.watchShared && watchShared()) html += window.cloudSOSActive && cloudSOSActive()
+    ? '<button class="primary alt" data-a="family-ok">I\'m OK now: cancel the family alert</button>'
+    : '<button class="primary sos-family" data-a="family">Alert my family (Ride Watch link)</button>';
   html += `<h2>Before you lose signal</h2><button class="ghost" data-a="checkin">Tell someone your plan</button>`;
   $('#sheet-body').innerHTML = html;
   $('#sheet-body').onclick = async (e) => {
@@ -182,6 +185,8 @@ function showSOS() {
     }
     if (a === 'hosp-go') driveTo(hosp.p.lat, hosp.p.lng);
     if (a === 'checkin') showCheckin();
+    if (a === 'family') { const ok = window.cloudSOS && await cloudSOS(at.lat, at.lng); toast(ok ? 'Alert sent to your family link. With no signal it sends as soon as you get one.' : 'Sign in under Crew & Ride Watch first.'); if (ok) showSOS(); }
+    if (a === 'family-ok') { await cloudSOSClear(); toast('Alert cancelled. Your family link shows you\'re OK.'); showSOS(); }
   };
   openSheet('#sheet');
 }

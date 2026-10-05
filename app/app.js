@@ -413,6 +413,7 @@ function onPos(pos) {
   if (speed != null && speed > 0.5) bits.push(`${Math.round(speed * 2.237)} mph`);
   $('#scale-info').textContent = bits.join(' · ');
   if (window.onTrackPos) window.onTrackPos(pos);
+  if (window.cloudFix) window.cloudFix(pos);
   if (window.onPlanPos) window.onPlanPos(pos);
 }
 function onPosErr(err) {

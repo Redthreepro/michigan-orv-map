@@ -251,6 +251,12 @@ a { color: #6fa8ff; }
 .mark-grid [data-r] svg { color: #ff8c00; }
 .mark-grid .mk-photo svg { color: #a98bff; }
 .primary svg { width: 20px; height: 20px; vertical-align: -4px; }
+.cloud-btn { color: #7fd8ff; border-color: #7fd8ff66; }
+.link-btn { background: none; border: 0; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
+.crew-code { font-size: 20px; letter-spacing: .12em; }
+.sw.crew { background: #19c3b0; opacity: .7; }
+.wp.crew { box-shadow: 0 0 0 3px #19c3b0; }
+.primary.sos-family { background: #c62828; color: #fff; }
 #ride-dash { position: fixed; left: 12px; right: 78px; bottom: calc(96px + var(--safe-b)); z-index: 1001; display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr;
   background: var(--panel); border-radius: 14px; box-shadow: 0 2px 10px #0007; padding: 6px 4px; text-align: center; }
 #ride-dash[hidden] { display: none; }

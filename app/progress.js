@@ -251,7 +251,8 @@ function renderGoalCard() {
   el.innerHTML = `<div class="goal-top"><b>Ride every trail in Michigan</b><span>${fmtPct(p)}</span></div>
     <div class="goal-bar"><span style="width:${p.toFixed(2)}%"></span></div>
     <small>${fmtMi(s.riddenM)} of ${fmtMi(s.totalM)} ridden · ${s.started.length} of ${s.list.length} trails &amp; routes started${rig ? ` · for your ${machineName()}` : ''}</small>
-    ${(() => { const r = roadSummary(); return r.loaded ? `<small class="goal-bonus">Bonus: ${fmtMi(r.riddenM)} of ${fmtMi(r.totalM)} of forest roads</small>` : ''; })()}`;
+    ${(() => { const r = roadSummary(); return r.loaded ? `<small class="goal-bonus">Bonus: ${fmtMi(r.riddenM)} of ${fmtMi(r.totalM)} of forest roads</small>` : ''; })()}
+    ${window.crewGoalLine ? crewGoalLine() : ''}`;
 }
 function showGoal() {
   const s = goalSummary();
@@ -313,6 +314,7 @@ window.refreshProgress = () => {
     await computeProgress();
     drawProgress();
     renderGoalCard();
+    if (window.cloudProgress) cloudProgress();
     if (!$('#panel-goal').hidden) showGoal();
   }, 300);
 };

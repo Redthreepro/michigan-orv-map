@@ -237,7 +237,7 @@ function showPlace(p, wp) {
     if (a === 'drive') driveTo(p.lat, p.lng);
     if (a === 'send') sendDirections(p.lat, p.lng, name);
     if (a === 'edit') editWaypoint(wp);
-    if (a === 'del' && confirm(`Delete waypoint "${wp.name}"?`)) { if (window.dropPhotos) await dropPhotos(wp); await tx('readwrite', (s) => s.delete(wp.id), 'waypoints'); closeSheets(); loadWaypoints(); }
+    if (a === 'del' && confirm(`Delete waypoint "${wp.name}"?`)) { if (window.dropPhotos) await dropPhotos(wp); if (window.cloudReportGone) cloudReportGone(wp); await tx('readwrite', (s) => s.delete(wp.id), 'waypoints'); closeSheets(); loadWaypoints(); }
   };
   openSheet('#sheet');
 }

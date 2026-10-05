@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Live ride</title>
+<meta name="theme-color" content="#1b1f1a">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+  :root { --bg: #1b1f1a; --panel: #23281f; --text: #eef2ea; --muted: #a3ab9f; --line: #3a4138; --est: #ff8c00; --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #map { position: fixed; inset: 0; }
+  #card { position: fixed; left: 10px; right: 10px; top: calc(10px + var(--safe-t)); z-index: 1000; background: var(--panel); border-radius: 14px;
+    padding: 12px 14px; box-shadow: 0 4px 16px #0009; max-width: 560px; margin: 0 auto; }
+  #card h1 { font-size: 18px; margin: 0 0 4px; }
+  #status { font-weight: 700; }
+  #status.riding { color: #5fd16f; } #status.paused, #status.camp { color: #ffd400; } #status.sos { color: #ff6b6b; } #status.stale { color: var(--est); }
+  #sub, #legend { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  #legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -2px; margin: 0 4px 0 8px; }
+  #legend i:first-child { margin-left: 0; }
+  #sos { display: none; background: #c62828; color: #fff; border-radius: 10px; padding: 10px; margin-top: 8px; font-weight: 700; }
+  #sos a { color: #fff; }
+  #follow { position: fixed; right: 12px; bottom: calc(24px + var(--safe-b)); z-index: 1000; border: 0; border-radius: 24px; padding: 12px 16px;
+    background: var(--panel); color: var(--text); font: inherit; font-weight: 700; box-shadow: 0 2px 10px #0008; }
+  .est-dot { border: 3px dashed var(--est); border-radius: 50%; background: #ff8c0033; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="card">
+  <h1 id="title">Live ride</h1>
+  <div id="status">Loading…</div>
+  <div id="sub"></div>
+  <div id="sos"></div>
+  <div id="legend"><i style="background:#1e6bff"></i>Last real position<i style="background:transparent;border:2px dashed #ff8c00"></i>Estimated (no signal)</div>
+</div>
+<button id="follow">Center on rider</button>
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/firebase-app-compat.js?v=12.19.0"></script>
+<script src="vendor/firebase-firestore-compat.js?v=12.19.0"></script>
+<script>
+'use strict';
+// Ride Watch viewer: what family at home opens from the rider's link. Read-only, no sign-in.
+// Solid blue = last real GPS position. Orange dashed = where the rider probably is now when updates
+// stop coming (dead zone): moved along their planned route at their average speed, or a "probably within"
+// circle when there's no plan. Real updates replace the estimate as soon as they arrive.
+const FB_CONFIG = { apiKey: 'AIzaSyBguxU2znTuUpOpqIOjPQUkC7aoasio1s8', authDomain: 'orv-map.firebaseapp.com', projectId: 'orv-map',
+  storageBucket: 'orv-map.firebasestorage.app', messagingSenderId: '1060406683876', appId: '1:1060406683876:web:7f75d4284f7344eceba4f1' };
+const EMU = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]emu=1/.test(location.search);
+const STALE_MS = 4 * 60000;   // no update for this long while riding: show the estimate
+const MAX_EST_MI = 40;
+const $ = (s) => document.querySelector(s);
+const id = new URLSearchParams(location.search).get('id');
+
+const map = L.map('map', { zoomControl: false }).setView([44.3, -85.6], 7);
+L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16, attribution: 'USGS The National Map' }).addTo(map);
+const planLine = L.polyline([], { color: '#1e6bff', weight: 4, opacity: 0.35, dashArray: '6 8', interactive: false }).addTo(map);
+const pathLine = L.polyline([], { color: '#ff2fd0', weight: 5, opacity: 0.9, interactive: false }).addTo(map);
+const estLine = L.polyline([], { color: '#ff8c00', weight: 4, dashArray: '4 8', interactive: false }).addTo(map);
+const estArea = L.circle([0, 0], { radius: 1, color: '#ff8c00', weight: 2, dashArray: '6 6', fillOpacity: 0.08, interactive: false });
+const realDot = L.circleMarker([0, 0], { radius: 9, color: '#fff', weight: 3, fillColor: '#1e6bff', fillOpacity: 1 });
+const estDot = L.marker([0, 0], { icon: L.divIcon({ className: 'est-dot', iconSize: [24, 24] }), interactive: false });
+const sosDot = L.circleMarker([0, 0], { radius: 12, color: '#fff', weight: 3, fillColor: '#e53935', fillOpacity: 1 });
+
+let doc = null, pts = [], unsubPts = null, rideKey = null, fitted = false, follow = true;
+const hav = (a, b, c, d) => { const R = 6371000, r = Math.PI / 180, x = (c - a) * r, y = (d - b) * r; const h = Math.sin(x / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(y / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const clock = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const day = (t) => (new Date(t).toDateString() === new Date().toDateString() ? '' : ' ' + new Date(t).toLocaleDateString([], { weekday: 'short' }));
+const ago = (ms) => { const m = Math.round(ms / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ${m % 60} min ago`; };
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pairs = (a) => { const o = []; for (let i = 0; i + 1 < (a || []).length; i += 2) o.push([a[i], a[i + 1]]); return o; };
+
+// where the rider probably is now: along the plan from the closest point to their last real fix
+function estimate(d) {
+  if (!d || d.status !== 'riding' || !d.last) return null;
+  const age = Date.now() - d.last.t;
+  if (age < STALE_MS) return null;
+  const mph = d.mph > 3 ? Math.min(d.mph, 30) : 17;
+  const want = Math.min(mph * (age / 3600000), MAX_EST_MI) * 1609.344;
+  const plan = pairs(d.plan);
+  if (plan.length > 1) {
+    let k = 0, best = Infinity;
+    plan.forEach((p, i) => { const m = hav(d.last.lat, d.last.lng, p[0], p[1]); if (m < best) { best = m; k = i; } });
+    if (best < 3000) {
+      const path = [[d.last.lat, d.last.lng]];
+      let left = want;
+      for (let i = k; i + 1 < plan.length && left > 0; i++) {
+        const seg = hav(plan[i][0], plan[i][1], plan[i + 1][0], plan[i + 1][1]);
+        if (seg >= left) { const f = left / seg; path.push([plan[i][0] + (plan[i + 1][0] - plan[i][0]) * f, plan[i][1] + (plan[i + 1][1] - plan[i][1]) * f]); left = 0; break; }
+        path.push(plan[i + 1]); left -= seg;
+      }
+      return { kind: 'route', at: path[path.length - 1], path, mph, done: left > 0 };
+    }
+  }
+  return { kind: 'area', radius: want, mph };
+}
+
+function render() {
+  const d = doc;
+  if (!d) return;
+  $('#title').textContent = `${d.name || 'Rider'}'s ride${d.title ? ' · ' + d.title : ''}`;
+  const st = $('#status'), sub = $('#sub');
+  const last = d.last;
+  const age = last ? Date.now() - last.t : Infinity;
+  const est = estimate(d);
+  st.className = d.status || '';
+  if (d.status === 'sos') {
+    st.textContent = 'Emergency alert';
+    const s = d.sos || last;
+    $('#sos').style.display = 'block'; $('#sos').style.background = '';
+    $('#sos').innerHTML = `${esc(d.name || 'The rider')} sent an emergency alert at ${clock(d.statusAt)}${day(d.statusAt)}.<br>Location: ${s ? `${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}` : 'unknown'}.<br>Try calling them. If you can't reach them, <a href="tel:911">call 911</a> and read them these numbers.`;
+  } else $('#sos').style.display = 'none';
+  if (d.status !== 'sos' && d.sosCleared && Date.now() - d.sosCleared < 6 * 3600000) {
+    $('#sos').style.display = 'block'; $('#sos').style.background = '#2e7d32';
+    $('#sos').textContent = `${d.name || 'The rider'} cancelled the emergency alert at ${clock(d.sosCleared)}${day(d.sosCleared)}: they're OK.`;
+  } else if (d.status !== 'sos') $('#sos').style.background = '';
+  if (d.status === 'riding') {
+    if (est) { st.className = 'stale'; st.textContent = `No signal since ${clock(last.t)}${day(last.t)} (${ago(age)})`; }
+    else st.textContent = last ? `Riding · updated ${ago(age)}` : 'Ride started · waiting for the first position';
+  } else if (d.status === 'paused') st.textContent = `Stopped since ${clock(d.statusAt)}${day(d.statusAt)}`;
+  else if (d.status === 'camp') st.textContent = `Stopped for the night at camp since ${clock(d.statusAt)}${day(d.statusAt)}`;
+  else if (d.status === 'ended') st.textContent = `Ride ended at ${clock(d.ended || d.statusAt)}${day(d.ended || d.statusAt)}`;
+  else if (d.status !== 'sos') st.textContent = 'Not riding right now. This page updates by itself when a ride starts.';
+  const bits = [];
+  if (d.started && d.status !== 'idle') bits.push(`started ${clock(d.started)}${day(d.started)}`);
+  if (d.mi) bits.push(`${d.mi.toFixed(1)} mi`);
+  if (d.mph) bits.push(`avg ${Math.round(d.mph)} mph`);
+  if (est) bits.push(est.kind === 'route' ? `orange = estimated, moving along their planned route at ~${Math.round(est.mph)} mph${est.done ? ' (end of the plan)' : ''}`
+    : `probably within ${Math.max(1, Math.round(est.radius / 1609.344))} mi of the last real position`);
+  sub.textContent = bits.join(' · ');
+  $('#legend').style.display = d.status === 'idle' ? 'none' : '';
+
+  planLine.setLatLngs(pairs(d.plan));
+  if (last && d.status !== 'idle') { realDot.setLatLng([last.lat, last.lng]).addTo(map); } else map.removeLayer(realDot);
+  if (d.status === 'sos' && (d.sos || last)) sosDot.setLatLng([(d.sos || last).lat, (d.sos || last).lng]).addTo(map); else map.removeLayer(sosDot);
+  map.removeLayer(estDot); map.removeLayer(estArea); estLine.setLatLngs([]);
+  if (est && est.kind === 'route') { estLine.setLatLngs(est.path); estDot.setLatLng(est.at).addTo(map); }
+  if (est && est.kind === 'area') estArea.setLatLng([last.lat, last.lng]).setRadius(est.radius).addTo(map);
+
+  map.invalidateSize();
+  if (follow && map.getSize().x > 0) {
+    const b = L.latLngBounds([]);
+    if (last && d.status !== 'idle') b.extend([last.lat, last.lng]);
+    if (est && est.kind === 'route') b.extend(est.at);
+    if (est && est.kind === 'area') b.extend(estArea.getBounds());
+    if (!fitted && pathLine.getLatLngs().length) b.extend(pathLine.getBounds());
+    if (!b.isValid() && planLine.getLatLngs().length) b.extend(planLine.getBounds());
+    if (b.isValid()) { map.fitBounds(b.pad(0.3), { maxZoom: 14 }); fitted = true; }
+  }
+}
+
+function watchPoints(key) {
+  if (unsubPts) unsubPts();
+  pts = []; pathLine.setLatLngs([]); rideKey = key;
+  if (!key) return;
+  unsubPts = db.collection('watch').doc(id).collection('pts').where('rideKey', '==', key).onSnapshot((q) => {
+    const batches = [];
+    q.forEach((x) => batches.push(x.data()));
+    batches.sort((a, b) => a.t0 - b.t0);
+    const out = [];
+    for (const b of batches) for (let i = 0; i + 2 < b.p.length; i += 3) out.push([b.p[i], b.p[i + 1]]);
+    pathLine.setLatLngs(out);
+    render();
+  }, () => {});
+}
+
+let db;
+if (!id) { $('#status').textContent = 'This link is missing its ride code. Ask for the link again.'; }
+else {
+  firebase.initializeApp(EMU ? { ...FB_CONFIG, projectId: 'demo-orv', apiKey: 'demo-key' } : FB_CONFIG);
+  db = firebase.firestore();
+  if (EMU) db.useEmulator('127.0.0.1', 8080);
+  db.collection('watch').doc(id).onSnapshot((s) => {
+    if (!s.exists) { doc = null; $('#status').textContent = 'This link isn\'t active anymore. Ask for a new one.'; $('#sub').textContent = ''; $('#legend').style.display = 'none'; return; }
+    doc = s.data();
+    if (doc.rideKey !== rideKey) watchPoints(doc.rideKey);
+    render();
+  }, () => { $('#status').textContent = 'Can\'t load the ride right now. Check your connection.'; });
+  setInterval(render, 30000); // ages and the estimate move even when nothing new arrives
+}
+map.on('dragstart', () => { follow = false; });
+window.addEventListener('resize', () => { map.invalidateSize(); render(); });
+$('#follow').addEventListener('click', () => { follow = true; fitted = false; render(); });
+</script>
+</body>
+</html>

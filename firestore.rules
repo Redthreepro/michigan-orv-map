@@ -1,0 +1,56 @@
+rules_version = '2';
+// Michigan ORV Map (project orv-map). Paste into Firebase console > Firestore > Rules > Publish.
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    // Ride Watch: a rider shares a private link (the long random ID is the key).
+    // Anyone with the link can see that one ride; only the rider who started it can write to it.
+    match /watch/{id} {
+      allow get: if true;
+      allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.owner == request.auth.uid;
+
+      // GPS points, sent in small batches (and caught up after a dead zone)
+      match /pts/{p} {
+        allow read: if true;
+        allow create, delete: if request.auth != null
+          && get(/databases/$(db)/documents/watch/$(id)).data.owner == request.auth.uid;
+      }
+    }
+
+    // Crews: join with the crew code (the document ID). Members see the crew's ridden trails and
+    // trail reports; each member can only change their own entries.
+    match /crews/{code} {
+      function isMember() {
+        return request.auth != null
+          && request.auth.uid in get(/databases/$(db)/documents/crews/$(code)).data.members;
+      }
+      allow get: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.members.keys().hasOnly([request.auth.uid]);
+      allow update: if request.auth != null && (
+        resource.data.owner == request.auth.uid
+        // joining or leaving: only your own name in the member list changes
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+            && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid]))
+      );
+      allow delete: if request.auth != null && resource.data.owner == request.auth.uid;
+
+      match /ridden/{uid} {
+        allow read: if isMember();
+        allow write: if isMember() && uid == request.auth.uid;
+      }
+      match /reports/{rid} {
+        allow read: if isMember();
+        allow create: if isMember() && request.resource.data.by == request.auth.uid;
+        allow update, delete: if isMember();
+      }
+    }
+
+    // everything else stays locked
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

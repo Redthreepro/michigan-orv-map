@@ -63,6 +63,7 @@ let saveT = null;
 let tickT = null;
 
 window.isRecording = () => !!rec;
+window.currentRec = () => rec;
 // first recorded point of this ride (where the truck is, usually)
 window.rideStartPoint = () => { const p = rec && rec.segs.find((s) => s.length); return p ? p[0] : null; };
 
@@ -96,6 +97,7 @@ window.onTrackPos = (pos) => {
   if (last && meters(last, p) < MIN_MOVE_M) return;
   if (last && p[3] - last[3] < 60000 && meters(last, p) / ((p[3] - last[3]) / 1000) > MOVING_MS) rec.moveMs = (rec.moveMs || 0) + (p[3] - last[3]);
   seg.push(p);
+  if (window.cloudPoint) cloudPoint(p);
   if (recLine) recLine.addLatLng([p[0], p[1]]); else drawRec();
   saveSoon();
 };
@@ -118,12 +120,15 @@ function startRec() {
   refreshRecUi();
   toast('Recording. Keep the app open. The screen will stay on.');
   if (window.offerStartPhoto) offerStartPhoto();
+  if (window.cloudRide) cloudRide('start', rec);
 }
 function pauseRec() {
   rec.paused = true; putTrack(rec); unlockScreen(); refreshRecUi();
+  if (window.cloudRide) cloudRide('paused');
 }
 function resumeRec() {
   rec.paused = false; rec.segs.push([]); putTrack(rec); ensureGps(); lockScreen(); refreshRecUi();
+  if (window.cloudRide) cloudRide('riding');
 }
 async function stopRec() {
   const s = stats(rec);
@@ -136,6 +141,7 @@ async function stopRec() {
     }
   }
   rec.done = true; rec.end = Date.now();
+  if (window.cloudRide) cloudRide('ended');
   await putTrack(rec);
   const saved = rec;
   rec = null; drawRec(); unlockScreen();
@@ -276,6 +282,7 @@ $('#ride-actions').addEventListener('click', async (e) => {
     if (!wp) return;
     rec.camps = [...(rec.camps || []), { lat: wp.lat, lng: wp.lng, t: Date.now() }];
     if (!rec.paused) pauseRec(); else putTrack(rec);
+    if (window.cloudRide) cloudRide('camp');
     toast('Camp saved and ride paused. Sleep well.');
   }
   if (a === 'sos') showSOS();

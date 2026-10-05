@@ -121,6 +121,7 @@ function showMarkMenu() {
     if (b.dataset.r) {
       closeSheets();
       const wp = await dropWaypoint('report', REPORTS[b.dataset.r], { r: b.dataset.r, at: Date.now() });
+      if (wp && window.cloudReport) cloudReport(wp);
       if (wp) toast(`${REPORTS[b.dataset.r]} reported here. Tap the pin to add a photo or note.`);
     }
   };
@@ -179,6 +180,7 @@ window.spotExtras = (wp) => {
 window.spotClick = async (wp, a) => {
   if (a === 'photo') { if (await addPhotoTo(wp)) showPlace({ lat: wp.lat, lng: wp.lng, n: wp.name }, wp); return true; }
   if (a === 'cleared') {
+    if (window.cloudReportGone) cloudReportGone(wp);
     await dropPhotos(wp);
     await tx('readwrite', (s) => s.delete(wp.id), 'waypoints');
     closeSheets(); await loadWaypoints(); toast('Report removed');

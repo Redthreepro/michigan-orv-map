@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=44">
+<link rel="stylesheet" href="style.css?v=46">
 </head>
 <body>
 <div id="map"></div>
@@ -95,6 +95,7 @@
 <section id="panel-layers" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
   <div class="rec-row"><button id="btn-sos" class="ghost sos">SOS / emergency</button><button id="btn-laws" class="ghost">Rules &amp; permits</button></div>
+  <button id="btn-cloud" class="ghost cloud-btn">Crew &amp; Ride Watch (live link for family)</button>
   <button id="btn-updates" class="ghost">DNR trail updates (last 60 days)</button>
   <button id="btn-plans" class="ghost">My saved ride plans</button>
   <h2>My machine</h2>
@@ -141,6 +142,7 @@
     <summary>My riding <small class="grp-count"></small></summary>
     <label class="row"><input type="checkbox" data-kind="ridden" checked><i class="sw ridden"></i>Trails I've ridden</label>
     <label class="row"><input type="checkbox" data-kind="allrides"><i class="sw allrides"></i>All my rides</label>
+    <label class="row"><input type="checkbox" data-kind="crew" checked><i class="sw crew"></i>Crew's ridden trails</label>
   </details>
 
   <details class="grp" data-grp="camping">
@@ -319,23 +321,24 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=44"></script>
-<script src="tracks.js?v=44"></script>
-<script src="routing.js?v=44"></script>
-<script src="places.js?v=44"></script>
-<script src="plan.js?v=44"></script>
-<script src="nav.js?v=44"></script>
-<script src="offline.js?v=44"></script>
-<script src="gpx.js?v=44"></script>
-<script src="weather.js?v=44"></script>
-<script src="progress.js?v=44"></script>
-<script src="details.js?v=44"></script>
-<script src="edit.js?v=44"></script>
-<script src="select.js?v=44"></script>
-<script src="updates.js?v=44"></script>
-<script src="laws.js?v=44"></script>
-<script src="safety.js?v=44"></script>
-<script src="merge.js?v=44"></script>
-<script src="spots.js?v=44"></script>
+<script src="app.js?v=46"></script>
+<script src="tracks.js?v=46"></script>
+<script src="routing.js?v=46"></script>
+<script src="places.js?v=46"></script>
+<script src="plan.js?v=46"></script>
+<script src="nav.js?v=46"></script>
+<script src="offline.js?v=46"></script>
+<script src="gpx.js?v=46"></script>
+<script src="weather.js?v=46"></script>
+<script src="progress.js?v=46"></script>
+<script src="details.js?v=46"></script>
+<script src="edit.js?v=46"></script>
+<script src="select.js?v=46"></script>
+<script src="updates.js?v=46"></script>
+<script src="laws.js?v=46"></script>
+<script src="safety.js?v=46"></script>
+<script src="merge.js?v=46"></script>
+<script src="spots.js?v=46"></script>
+<script src="cloud.js?v=46"></script>
 </body>
 </html>

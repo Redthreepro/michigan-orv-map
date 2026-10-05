@@ -23,6 +23,13 @@ roads open to ORVs (shown from zoom 10 in).
 - **Public hunting land**: trails on state forest, state game areas, national forest and Commercial Forest
   land get `hl` (they fall under the Nov 15–30 riding hours). The outline lives in `land/hunt_land.geojson`;
   rebuild it with `python build_hunt.py` (not nightly); `build.py` re-tags trails and roads every night.
+- **Online (optional, Firebase project `orv-map` on the Red Three Pro account)**: `app/cloud.js` loads the vendored
+  Firebase SDK only when used. Sign in with Google or email. **Ride Watch**: a family link (`watch.html?id=...`) shows
+  the live ride, and with no signal an estimated position along the planned route at the rider's average speed;
+  offline writes queue on the phone and send when signal returns. **Crews**: join by code; shared ridden trails
+  (teal layer, combined goal) and trail reports. Security rules: `firestore.rules`, pasted into the Firebase console.
+  Local testing: `firebase emulators:start --only auth,firestore --project demo-orv` with those rules, then open
+  `http://localhost:8765/?emu=1`.
 - **Waypoints**: save your own spots, route to them, add them to trips, share as GPX.
 - **Offline panel** (download button): a ready-for-no-signal checklist (home-screen app vs browser tab,
   app files saved, closure data age, storage protected, location allowed, trip map saved) plus
