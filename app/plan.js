@@ -103,7 +103,9 @@ function drawPlan(fit) {
 
 // ---------- summary ----------
 const fmtMi = (m) => (m / 1609.344).toFixed(m < 16093 ? 1 : 0) + ' mi';
-const fmtTime = (s) => { const m = Math.round(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+// riding time from distance at your 17-20 mph (select.js), same as for selected trails; slow end for long-day checks
+const tripTime = (m, short) => rideTimeText(m / 1609.344, short);
+const slowSecs = (m) => m / (RIDE_MPH[0] * 0.44704);
 const totals = (legs) => legs.reduce((a, r) => ({ m: a.m + r.meters, s: a.s + r.secs }), { m: 0, s: 0 });
 
 function days() {
@@ -244,8 +246,8 @@ function tripWarnings(gas) {
 
   // long days
   const ds = days();
-  if (ds.length > 1) ds.forEach((d, i) => { if (d.s > LONG_DAY_S) w.push({ level: 'warn', text: `Day ${i + 1} is about ${fmtTime(d.s)} of riding. Consider another overnight stop.` }); });
-  else if (t.s > LONG_DAY_S) w.push({ level: 'warn', text: `About ${fmtTime(t.s)} of riding. Consider an overnight stop.` });
+  if (ds.length > 1) ds.forEach((d, i) => { if (slowSecs(d.m) > LONG_DAY_S) w.push({ level: 'warn', text: `Day ${i + 1} is about ${tripTime(d.m)} of riding. Consider another overnight stop.` }); });
+  else if (slowSecs(t.m) > LONG_DAY_S) w.push({ level: 'warn', text: `About ${tripTime(t.m)} of riding. Consider an overnight stop.` });
 
   // difficulty the DNR flags on the route
   const x4 = planLegs.reduce((a, r) => a + (r.x4 || 0), 0), hc = planLegs.reduce((a, r) => a + (r.hc || 0), 0);
@@ -286,7 +288,7 @@ function showPlan() {
   const isTrip = n > 2 || plan.stops.some((s) => s.night);
   let html = `<h3>${n < 2 ? 'Trip' : isTrip ? 'Trip' : 'Route'}${n >= 2 ? ': ' + fmtMi(t.m) : ''}</h3>`;
   if (n < 2) html += `<p class="hint">Add another stop: long-press the map, or tap a gas station, campground, waypoint, or trail and choose "Add to trip".</p>`;
-  else html += `<p class="hint">About ${fmtTime(t.s)} of riding${rig ? ` · for machines up to ${rig}"` : ''}</p>`;
+  else html += `<p class="hint">About ${tripTime(t.m)} of riding at ${RIDE_MPH[0]}–${RIDE_MPH[1]} mph${rig ? ` · for machines up to ${rig}"` : ''}</p>`;
 
   const gasList = planLegs.length ? alongTrip('gas', GAS_NEAR_M) : [];
   const warns = planLegs.length ? tripWarnings(gasList) : [];
@@ -300,7 +302,7 @@ function showPlan() {
 
   const ds = n >= 2 ? days() : [];
   if (ds.length > 1) {
-    html += '<div class="days">' + ds.map((d, i) => `<div><b>Day ${i + 1}</b> · ${fmtMi(d.m)} · ~${fmtTime(d.s)}<small>${esc(plan.stops[d.from].name)} → ${esc(plan.stops[d.to].name)}</small></div>`).join('') + '</div>';
+    html += '<div class="days">' + ds.map((d, i) => `<div><b>Day ${i + 1}</b> · ${fmtMi(d.m)} · ${tripTime(d.m, true)}<small>${esc(plan.stops[d.from].name)} → ${esc(plan.stops[d.to].name)}</small></div>`).join('') + '</div>';
   }
 
   html += '<ol class="stops">';
@@ -327,7 +329,7 @@ function showPlan() {
     if (r) {
       const via = r.steps.slice().sort((a, b) => b.meters - a.meters).slice(0, 2).map((x) => x.label).join(', ');
       html += `<li class="leg" data-leg="${i}">${r.fail ? '<b>No trail you can ride within 15 mi of this stop</b>'
-        : `${fmtMi(r.meters)} · ~${fmtTime(r.secs)}${via ? ' · via ' + esc(via) : ''}`}
+        : `${fmtMi(r.meters)} · ${tripTime(r.meters, true)}${via ? ' · via ' + esc(via) : ''}`}
         ${r.gap ? `<small class="warn">Doesn't connect: last ${fmtMi(r.gap.meters)} has no DNR trail or forest road (red dashes). Check county road rules.</small>` : ''}
         ${r.seasonal > 50 ? `<small class="warn">${fmtMi(r.seasonal)} on seasonally closed forest road. Check dates.</small>` : ''}
         ${r.military > 50 ? '<small class="warn">Crosses Camp Grayling military roads.</small>' : ''}</li>`;
@@ -405,7 +407,7 @@ function updateBar() {
   const gap = planLegs.some((r) => r.gap || r.fail);
   const nw = planLegs.length ? tripWarnings(alongTrip('gas', GAS_NEAR_M)).filter((x) => x.level !== 'info').length : 0;
   bar.querySelector('span').textContent = n < 2 ? '1 stop · add more'
-    : `${fmtMi(t.m)}${gap ? ' · has gaps' : ' · ~' + fmtTime(t.s)}${n > 2 ? ` · ${n} stops` : ''}${nw ? ` · ${nw} warning${nw > 1 ? 's' : ''}` : ''}`;
+    : `${fmtMi(t.m)}${gap ? ' · has gaps' : ' · ' + tripTime(t.m, true)}${n > 2 ? ` · ${n} stops` : ''}${nw ? ` · ${nw} warning${nw > 1 ? 's' : ''}` : ''}`;
 }
 
 function clearPlan() {
