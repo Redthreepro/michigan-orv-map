@@ -7,7 +7,7 @@ import re
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -344,8 +344,88 @@ def build_pois(trail_features):
           f"{sum(p['t'] == 'th' for p in pois)} ORV trailheads/parking, {sum(p['t'] == 'town' for p in pois)} towns")
 
 
+CHANGE_DAYS = 60          # how long a change stays in the app's "Trail updates" list
+CHURN_LIMIT = 0.3         # if more than this share of IDs changed, the DNR re-published everything: no itemized list
+
+
+def _group(feats):
+    """(kind, name) -> {mi, bbox, county} for a list of features."""
+    out = {}
+    for f in feats:
+        p = f["properties"]
+        key = (p["t"], p.get("n") or "")
+        g = out.setdefault(key, {"mi": 0.0, "bbox": [90, 180, -90, -180], "co": p.get("co")})
+        g["mi"] += p.get("mi") or 0
+        geom = f["geometry"]
+        lines = [geom["coordinates"]] if geom["type"] == "LineString" else geom["coordinates"] if geom["type"] == "MultiLineString" else []
+        for line in lines:
+            for x, y in line:
+                b = g["bbox"]
+                b[0], b[1], b[2], b[3] = min(b[0], y), min(b[1], x), max(b[2], y), max(b[3], x)
+    return out
+
+
+def diff_trails(prev, cur, day):
+    """What changed between two nights of DNR trail segments, as a list for the app."""
+    pid = {f["properties"]["id"]: f for f in prev if f["properties"].get("id")}
+    cid = {f["properties"]["id"]: f for f in cur if f["properties"].get("id")}
+    if not pid or not cid:
+        return []
+    gone, new = pid.keys() - cid.keys(), cid.keys() - pid.keys()
+    if len(gone | new) > CHURN_LIMIT * max(len(pid), len(cid)):
+        return [{"d": day, "k": "bulk", "n": f"The DNR republished its trail data ({len(new)} pieces replaced). "
+                 "Closures on the map are current; there's no itemized list for this update."}]
+    changes = []
+    what = {"closure": ("closed", "reopened"), "reroute": ("reroute", "reroute-end")}
+    for ids, src, side in ((new, cid, 0), (gone, pid, 1)):
+        for (t, n), g in _group([src[i] for i in ids]).items():
+            k = what[t][side] if t in what else ("new" if side == 0 else "removed")
+            changes.append({"d": day, "k": k, "t": t, "n": n or "Unnamed trail", "co": g["co"],
+                            "mi": round(g["mi"], 1), "b": [round(v, 4) for v in g["bbox"]]})
+    # same piece, new status or width rule
+    for i in pid.keys() & cid.keys():
+        a, b = pid[i]["properties"], cid[i]["properties"]
+        for field, k in (("s", "status"), ("lim", "width")):
+            if a.get(field) != b.get(field):
+                g = _group([cid[i]])[(b["t"], b.get("n") or "")]
+                changes.append({"d": day, "k": k, "t": b["t"], "n": b.get("n") or "Unnamed trail", "co": b.get("co"),
+                                "mi": b.get("mi"), "b": [round(v, 4) for v in g["bbox"]],
+                                "from": a.get(field), "to": b.get(field)})
+    # one entry per trail per kind of change (a status change often touches many pieces)
+    merged = {}
+    for c in changes:
+        key = (c["k"], c["t"], c["n"], str(c.get("from")), str(c.get("to")))
+        m = merged.get(key)
+        if not m:
+            merged[key] = c
+            continue
+        m["mi"] = round((m.get("mi") or 0) + (c.get("mi") or 0), 1)
+        m["b"] = [min(m["b"][0], c["b"][0]), min(m["b"][1], c["b"][1]), max(m["b"][2], c["b"][2]), max(m["b"][3], c["b"][3])]
+    return list(merged.values())
+
+
+def write_changes(prev_feats, features, now):
+    day = now.strftime("%Y-%m-%d")
+    path = OUT / "changes.json"
+    try:
+        log = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError):
+        log = []
+    cutoff = (now - timedelta(days=CHANGE_DAYS)).strftime("%Y-%m-%d")
+    fresh = diff_trails(prev_feats, features, day)
+    log = [c for c in log if c["d"] >= cutoff and c["d"] != day] + fresh
+    path.write_text(json.dumps(log, separators=(",", ":")), encoding="utf-8")
+    print(f"trail changes today: {len(fresh)}  (log keeps {len(log)} from the last {CHANGE_DAYS} days)")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    # last run's trails, to report what the DNR changed since then
+    try:
+        prev_feats = [f for f in json.loads((OUT / "trails.geojson").read_text(encoding="utf-8"))["features"]
+                      if f["properties"].get("t") != "scramble"]
+    except FileNotFoundError:
+        prev_feats = []
     features = []
     for layer, (kind, name_field) in LAYERS.items():
         raw = fetch(f"{DNR}/{layer}")
@@ -395,6 +475,7 @@ def main():
         now = datetime.now(ZoneInfo("America/Detroit"))
     except Exception:  # Windows without tzdata: local clock is Michigan anyway
         now = datetime.now()
+    write_changes(prev_feats, features, now)
     meta = {"built": now.strftime("%Y-%m-%d %H:%M"), "segments": len(features),
             "closures": sum(1 for f in features if f["properties"]["t"] == "closure")}
     (OUT / "meta.json").write_text(json.dumps(meta), encoding="utf-8")

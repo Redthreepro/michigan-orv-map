@@ -65,6 +65,7 @@ async function computePlan({ fit = true, show = true } = {}) {
   }
   drawPlan(fit);
   updateBar();
+  if (window.refreshUpdChip) refreshUpdChip();
   if (show) showPlan();
   if (window.refreshOffline) setTimeout(refreshOffline, 500);
 }

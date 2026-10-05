@@ -76,6 +76,7 @@ function drawSel() {
   }
   store.set('sel', selItems);
   updateSelBar();
+  if (window.refreshUpdChip) refreshUpdChip();
 }
 map.on('zoomend', () => { if (selItems.length) drawSel(); });
 // after trails load or the machine width changes: drop trails that are no longer on the map

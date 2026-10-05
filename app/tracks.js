@@ -140,6 +140,7 @@ const recBtn = $('#btn-rec');
 const recBar = $('#rec-bar');
 
 function refreshRecUi() {
+  refreshRideActions();
   recBtn.classList.toggle('rec', !!rec && !rec.paused);
   recBtn.classList.toggle('paused', !!rec && rec.paused);
   recBar.hidden = !rec;
@@ -174,6 +175,82 @@ $('#rec-controls').addEventListener('click', (e) => {
   if (a === 'stop') stopRec();
 });
 recBtn.addEventListener('click', () => { renderList(); openSheet('#panel-rides'); });
+
+// ---------- action buttons on the map while riding ----------
+const PAUSE_SVG = '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
+const PLAY_SVG = '<svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>';
+function refreshRideActions() {
+  const bar = $('#ride-actions');
+  bar.hidden = !rec;
+  document.body.classList.toggle('recording', !!rec);
+  if (!rec) return;
+  const b = bar.querySelector('.ra-pause');
+  b.classList.toggle('resume', rec.paused);
+  b.innerHTML = (rec.paused ? PLAY_SVG : PAUSE_SVG) + `<span>${rec.paused ? 'Resume' : 'Pause'}</span>`;
+}
+function hereNow() {
+  if (meMarker) return meMarker.getLatLng();
+  const seg = rec && rec.segs.flat();
+  const p = seg && seg[seg.length - 1];
+  return p ? L.latLng(p[0], p[1]) : null;
+}
+const timeNow = () => new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+async function dropWaypoint(type, name) {
+  const at = hereNow();
+  if (!at) { ensureGps(); toast('Waiting for GPS. Try again in a few seconds.'); return null; }
+  const wp = { id: 'w' + Date.now(), lat: +at.lat.toFixed(6), lng: +at.lng.toFixed(6), name, type, note: rec ? `On ${rec.name}` : '' };
+  await tx('readwrite', (s) => s.put(wp), 'waypoints');
+  if (window.loadWaypoints) await loadWaypoints();
+  return wp;
+}
+async function shareSpot() {
+  const at = hereNow();
+  if (!at) { ensureGps(); return toast('Waiting for GPS. Try again in a few seconds.'); }
+  const ll = `${at.lat.toFixed(5)},${at.lng.toFixed(5)}`;
+  const url = `https://www.google.com/maps/search/?api=1&query=${ll}`;
+  const text = `I'm here: ${ll}`;
+  if (navigator.share) {
+    try { await navigator.share({ title: 'My location', text, url }); return; } catch (err) { if (err.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(`${text} ${url}`); toast('Location copied. Paste it in a text.'); }
+  catch { prompt('Copy your location:', `${text} ${url}`); }
+}
+// Pause/Resume needs a short hold (about half a second) so a bump doesn't flip it; the button fills while held.
+const HOLD_MS = 500;
+let holdT = null, holdDone = false;
+const pauseBtn = $('#ride-actions .ra-pause');
+function holdEnd() { clearTimeout(holdT); holdT = null; pauseBtn.classList.remove('holding'); }
+pauseBtn.addEventListener('pointerdown', (e) => {
+  if (!rec) return;
+  holdDone = false;
+  pauseBtn.classList.add('holding');
+  holdT = setTimeout(() => {
+    holdEnd();
+    holdDone = true;
+    if (navigator.vibrate) navigator.vibrate(40);
+    if (rec.paused) { resumeRec(); toast('Recording again'); } else { pauseRec(); toast('Paused. Hold Resume when you ride again.'); }
+  }, HOLD_MS);
+});
+for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) pauseBtn.addEventListener(ev, () => { if (holdT) holdEnd(); });
+pauseBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // a held finger shouldn't open the phone's menu
+$('#ride-actions').addEventListener('click', async (e) => {
+  const a = e.target.closest('button')?.dataset.a;
+  if (!a || !rec) return;
+  if (a === 'pause' && !holdDone) toast(`Hold the button to ${rec.paused ? 'resume' : 'pause'}`);
+  if (a === 'mark') {
+    const wp = await dropWaypoint('pin', 'Mark ' + timeNow());
+    if (wp) toast(`Saved "${wp.name}" at your spot. Rename it in Waypoints.`);
+  }
+  if (a === 'camp') {
+    if (!confirm('Stop for the night? This pauses the ride and saves a camp spot here. Tap Resume in the morning, even if the app was closed.')) return;
+    const wp = await dropWaypoint('camp', 'Camp ' + fmtDate(Date.now()));
+    if (!wp) return;
+    rec.camps = [...(rec.camps || []), { lat: wp.lat, lng: wp.lng, t: Date.now() }];
+    if (!rec.paused) pauseRec(); else putTrack(rec);
+    toast('Camp saved and ride paused. Sleep well.');
+  }
+  if (a === 'share') shareSpot();
+});
 recBar.addEventListener('click', () => { renderList(); openSheet('#panel-rides'); });
 
 // ---------- saved rides ----------
@@ -276,7 +353,7 @@ async function shareGpx(title, xml) {
     rec = open;
     rec.paused = true;
     drawRec();
-    toast('Your last ride was still recording. It is paused. Open Rides to resume or save it.');
+    toast('Your last ride is still here, paused. Hold Resume at the bottom to keep riding, or open Rides to save it.');
   }
   refreshRecUi();
 })();

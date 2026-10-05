@@ -106,6 +106,13 @@ dt { color: var(--muted); } dd { margin: 0; }
   display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }
 .chip[hidden] { display: none; }
 #route-bar { background: #1e6bffe6; }
+#upd-bar { background: #2b2f28f0; border: 2px solid #ffd400; }
+#upd-bar b { color: #ffd400; }
+#upd-bar.alert { background: #c62828f0; border-color: #fff; }
+#upd-bar.alert b { color: #fff; }
+#upd-bar span { max-width: 70vw; overflow: hidden; text-overflow: ellipsis; }
+.upd-list .upd { cursor: pointer; }
+.upd-list .upd b, .upd-list .upd small { display: block; }
 #sel-bar { background: #3a3f36f0; border: 2px solid #fff; }
 #sel-bar span { max-width: 62vw; overflow: hidden; text-overflow: ellipsis; }
 #sel-bar.adding { background: #ff2fd0; }
@@ -197,6 +204,21 @@ a { color: #6fa8ff; }
 #install-tip { position: fixed; left: 12px; right: 80px; bottom: calc(24px + var(--safe-b)); z-index: 1001; background: #1e6bff; color: #fff;
   border-radius: 12px; padding: 12px 40px 12px 14px; font-size: 14px; box-shadow: 0 2px 12px #0008; }
 #install-tip[hidden] { display: none; }
+/* big, glove-friendly buttons while a ride is recording */
+#ride-actions { position: fixed; left: 12px; right: 78px; bottom: calc(24px + var(--safe-b)); z-index: 1001; display: flex; gap: 8px; }
+#ride-actions[hidden] { display: none; }
+#ride-actions button { flex: 1; height: 64px; border: 0; border-radius: 16px; background: var(--panel); color: var(--text); box-shadow: 0 2px 10px #0007;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
+#ride-actions svg { width: 26px; height: 26px; }
+#ride-actions .ra-pause { flex: 1.4; background: #ffd400; color: #111; font-size: 14px; }
+#ride-actions .ra-pause.resume { background: #2fbf4a; color: #111; }
+#ride-actions .ra-pause { position: relative; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+#ride-actions .ra-pause > * { position: relative; }
+#ride-actions .ra-pause::before { content: ''; position: absolute; inset: 0; background: #0003; transform: scaleX(0); transform-origin: left; }
+#ride-actions .ra-pause.holding::before { transform: scaleX(1); transition: transform 0.5s linear; }
+#ride-actions button:active { transform: scale(0.96); }
+body.recording #scale-info, body.recording #install-tip { display: none; }
+body.tracing #ride-actions { display: none; }
 #install-tip .x { position: absolute; top: 4px; right: 4px; width: 34px; height: 34px; border: 0; background: none; color: #fff; font-size: 22px; cursor: pointer; }
 
 .poi-th { background: #f28c28; }
