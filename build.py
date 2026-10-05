@@ -41,6 +41,20 @@ LAYERS = {
 OUT = Path(__file__).parent / "app" / "data"
 
 
+def get_json(url, tries=4):
+    """GET with retries: state and federal map servers hiccup (500s, timeouts) now and then."""
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r:
+                return json.load(r)
+        except Exception as err:
+            if attempt == tries - 1:
+                raise
+            wait = 15 * 2 ** attempt
+            print(f"  fetch failed ({err}); retrying in {wait}s")
+            time.sleep(wait)
+
+
 def fetch(url, extra=None, page=1000):
     feats, offset = [], 0
     while True:
@@ -50,8 +64,7 @@ def fetch(url, extra=None, page=1000):
             "resultOffset": str(offset), "resultRecordCount": str(page),
         }
         q.update(extra or {})
-        with urllib.request.urlopen(f"{url}/query?{urllib.parse.urlencode(q)}", timeout=120) as r:
-            resp = json.load(r)
+        resp = get_json(f"{url}/query?{urllib.parse.urlencode(q)}")
         got = resp.get("features", [])
         feats += got
         if len(got) < page:
@@ -419,7 +432,9 @@ def write_changes(prev_feats, features, now):
         log = []
     cutoff = (now - timedelta(days=CHANGE_DAYS)).strftime("%Y-%m-%d")
     fresh = diff_trails(prev_feats, features, day)
-    log = [c for c in log if c["d"] >= cutoff and c["d"] != day] + fresh
+    # a second run the same day diffs against the first run's data: keep what that run found
+    seen = {(c["d"], c["k"], c.get("t"), c["n"], str(c.get("from")), str(c.get("to"))) for c in log}
+    log = [c for c in log if c["d"] >= cutoff] + [c for c in fresh if (c["d"], c["k"], c.get("t"), c["n"], str(c.get("from")), str(c.get("to"))) not in seen]
     path.write_text(json.dumps(log, separators=(",", ":")), encoding="utf-8")
     print(f"trail changes today: {len(fresh)}  (log keeps {len(log)} from the last {CHANGE_DAYS} days)")
 
@@ -469,16 +484,26 @@ def main():
     except FileNotFoundError:
         prev_feats = []
     features = []
-    for layer, (kind, name_field) in LAYERS.items():
-        raw = fetch(f"{DNR}/{layer}")
-        for f in raw:
-            if not f.get("geometry"):
-                continue
-            props = slim(f["properties"], kind, name_field)
-            if "lim" not in props:
-                continue  # hiking/snowmobile-only closure, not an ORV concern
-            features.append({"type": "Feature", "geometry": f["geometry"], "properties": props})
-        print(f"layer {layer:>2} {kind:<8} {len(raw):>5} segments")
+    dnr_ok = True
+    try:
+        for layer, (kind, name_field) in LAYERS.items():
+            raw = fetch(f"{DNR}/{layer}")
+            for f in raw:
+                if not f.get("geometry"):
+                    continue
+                props = slim(f["properties"], kind, name_field)
+                if "lim" not in props:
+                    continue  # hiking/snowmobile-only closure, not an ORV concern
+                features.append({"type": "Feature", "geometry": f["geometry"], "properties": props})
+            print(f"layer {layer:>2} {kind:<8} {len(raw):>5} segments")
+    except Exception as err:
+        if not prev_feats:
+            raise
+        # The DNR trail server is down: keep last run's trails (and its "checked" date, so the app's
+        # stale-closure warning stays honest) and still refresh roads, places and tags.
+        print(f"DNR trail server unavailable ({err}); reusing last run's {len(prev_feats)} trail segments")
+        dnr_ok = False
+        features = prev_feats
 
     areas = []
     for f in fetch(SCRAMBLE, {"maxAllowableOffset": "0.0001"}):
@@ -519,9 +544,17 @@ def main():
         now = datetime.now(ZoneInfo("America/Detroit"))
     except Exception:  # Windows without tzdata: local clock is Michigan anyway
         now = datetime.now()
-    write_changes(prev_feats, features, now)
+    if dnr_ok:
+        write_changes(prev_feats, features, now)
     meta = {"built": now.strftime("%Y-%m-%d %H:%M"), "segments": len(features),
             "closures": sum(1 for f in features if f["properties"]["t"] == "closure")}
+    if not dnr_ok:
+        try:
+            meta["built"] = json.loads((OUT / "meta.json").read_text(encoding="utf-8"))["built"]
+        except (FileNotFoundError, ValueError, KeyError):
+            pass
+        meta["note"] = f"DNR trail server down at {now.strftime('%Y-%m-%d %H:%M')}; closures as of last check"
+
     (OUT / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
     size = (OUT / "trails.geojson").stat().st_size / 1e6
     print(f"wrote trails.geojson {size:.1f} MB  {meta}")
