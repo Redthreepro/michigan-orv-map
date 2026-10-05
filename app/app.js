@@ -136,6 +136,7 @@ async function loadTrails() {
   }
   fillLayers();
   applyVisibility();
+  if (window.refreshSel) refreshSel(); // bring back what was selected last time
   // forest roads are big; load them after the trails are already on screen
   fetch('data/roads.geojson').then((r) => r.json()).then((roads) => {
     buildRoadCells(roads.features);
@@ -236,6 +237,7 @@ map.on('zoomend', restyle);
 
 // ---------- detail sheet ----------
 function showDetail(f, clicked, latlng) {
+  if (selAdding) return toggleSel(f); // adding trails to the selection: taps just add or remove
   const p = f.properties;
   const status = p.s || (p.t === 'closure' ? 'Temporarily Closed' : p.t === 'reroute' ? 'Temporary reroute'
     : p.t === 'road' ? (p.sea || p.mil ? 'Seasonally closed to ORVs' : 'Open to ORVs')
@@ -247,6 +249,7 @@ function showDetail(f, clicked, latlng) {
   } else total = p.mi || 0;
   const rows = [
     ['Allowed', p.lim === 24 ? 'Motorcycles only' : p.lim >= 999 ? 'Any size ORV' : p.lim ? `Machines up to ${p.lim}" wide` : null], ['Trail width', p.w], ['Surface', p.sf], ['Length', total ? total.toFixed(1) + ' mi' : null],
+    ['Ride time', total ? `About ${rideTimeText(total)} at ${RIDE_MPH[0]}–${RIDE_MPH[1]} mph` : null],
     ['County', p.co], ['Runs on', p.rd],
     ['Open', p.t === 'nf' ? (p.dates ? fmtDates(p.dates) : 'All year') : null], ['Forest', p.forest ? p.forest + ' National Forest' : null],
   ].filter(([, v]) => v);
@@ -260,28 +263,16 @@ function showDetail(f, clicked, latlng) {
   if (p.mil) html += `<div class="note restrict">Camp Grayling military road. May close without notice for training. Check Camp Grayling's Facebook page before riding.</div>`;
   if (p.c) html += `<div class="note">${esc(p.c)}</div>`;
   html += `<div class="rec-row"><button class="primary" id="btn-detail-route">Route here</button><button class="ghost" id="btn-detail-trip">Add to trip</button></div>`;
+  const sel = selDetail(f); // stays highlighted after this sheet closes
+  html += sel.html;
   $('#sheet-body').onclick = null;
   $('#sheet-body').innerHTML = html;
+  sel.wire();
   const target = latlng || (clicked.getCenter ? clicked.getCenter() : clicked.getBounds().getCenter());
   const label = p.n || KIND[p.t].label;
   $('#btn-detail-route').addEventListener('click', () => window.routeHere && window.routeHere(target, label));
   $('#btn-detail-trip').addEventListener('click', () => window.addToTrip && window.addToTrip(target, label));
   openSheet('#sheet');
-  highlightName(p, clicked);
-}
-
-function highlightName(p, clicked) {
-  if (highlight) map.removeLayer(highlight);
-  const feats = [];
-  if (p.n && layers[p.t] && !['closure', 'reroute', 'road'].includes(p.t)) {
-    layers[p.t].eachLayer((l) => { if (l.feature.properties.n === p.n) feats.push(l.feature); });
-  } else feats.push(clicked.feature);
-  highlight = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
-    renderer, interactive: false,
-    style: { color: '#fff', weight: lineWeight() + 6, opacity: 0.55, fillOpacity: 0.1 },
-  }).addTo(map);
-  // halo goes under the colored lines
-  highlight.bringToBack();
 }
 
 // ---------- sheets ----------
@@ -289,8 +280,7 @@ function openSheet(sel) {
   document.querySelectorAll('.sheet').forEach((s) => { s.hidden = s !== document.querySelector(sel); });
 }
 function closeSheets() {
-  document.querySelectorAll('.sheet').forEach((s) => { s.hidden = true; });
-  if (highlight) { map.removeLayer(highlight); highlight = null; }
+  document.querySelectorAll('.sheet').forEach((s) => { s.hidden = true; }); // selected trails stay highlighted (select.js)
 }
 document.querySelectorAll('.sheet .close').forEach((b) => b.addEventListener('click', closeSheets));
 // Only the trails canvas (overlay pane) takes taps directly. Every other canvas covers the whole map, so it
@@ -322,10 +312,10 @@ function setRig(v) {
   rig = v; store.set('rig', v);
   document.querySelectorAll('#rig-seg button').forEach((b) => b.classList.toggle('on', +b.dataset.rig === v));
   if (changed && layers.route) {
-    if (highlight) { map.removeLayer(highlight); highlight = null; }
     fillLayers();
     if (roadFeatures.length) buildRoadCells(roadFeatures);
     applyVisibility();
+    if (window.refreshSel) refreshSel();
   }
 }
 document.querySelectorAll('#rig-seg button').forEach((b) => b.addEventListener('click', () => setRig(+b.dataset.rig)));

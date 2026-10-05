@@ -3,7 +3,8 @@
 // Sections added this way count toward miles and the ride-every-trail goal, but not toward ride time.
 // ride.manual = indexes of segs added by hand; ride.taps[i] = the dots that seg was traced from, so it can be fixed later.
 
-const trace = { on: false, ride: null, fix: null, pts: [], legs: [], hist: [], layer: null };
+// mode 'pick' reuses all of this to pick the part of the trails you plan to ride (select.js); only legal trails count there.
+const trace = { on: false, mode: 'ride', pick: null, ride: null, fix: null, pts: [], legs: [], hist: [], layer: null };
 window.traceMode = () => trace.on;
 
 // ---------- edit sheet for one ride ----------
@@ -68,9 +69,11 @@ function dotsFromSeg(seg) {
 }
 
 // ---------- tracing ----------
-async function startTrace(ride, fix = null) {
+async function startTrace(ride, fix = null, pick = null) {
   try { await loadGraph(); } catch { return toast('Could not load the trail network'); }
   trace.on = true; trace.ride = ride; trace.fix = fix; trace.pts = []; trace.legs = []; trace.hist = [];
+  trace.mode = pick ? 'pick' : 'ride';
+  trace.pick = pick && pick !== true ? pick : null; // editing a ride picked earlier
   if (trace.layer) map.removeLayer(trace.layer);
   trace.layer = L.layerGroup().addTo(map);
   closeSheets();
@@ -85,6 +88,9 @@ async function startTrace(ride, fix = null) {
     map.fitBounds(L.latLngBounds(ride.segs[fix].map((p) => [p[0], p[1]])), { padding: [60, 60] });
   } else if (ride) {
     showTrack(ride, true); // see what was recorded, so you can trace up to where it starts or ends
+  } else if (trace.pick) {
+    trace.pts = trace.pick.dots.slice();
+    for (let i = 1; i < trace.pts.length; i++) trace.legs.push(traceLeg(trace.pts[i - 1], trace.pts[i]));
   }
   drawTrace();
 }
@@ -109,7 +115,7 @@ function traceLeg(a, b) {
   const straight = { coords: [a, b], straight: true };
   const direct = hav(a[0], a[1], b[0], b[1]);
   const snap = traceSnapM();
-  ROUTE_ANY = true;
+  ROUTE_ANY = trace.mode === 'ride';
   try {
     const S = candidates(a[0], a[1], 0)[0], T = candidates(b[0], b[1], 0)[0];
     if (!S || !T || S.d > snap || T.d > snap) return straight;
@@ -126,7 +132,8 @@ function traceLeg(a, b) {
 }
 function remember() { trace.hist.push({ pts: trace.pts.slice(), legs: trace.legs.slice() }); }
 function warnStraight(legs) {
-  if (legs.some((l) => l && l.straight)) toast('No trail there, so it drew a straight line. Undo, or drag the dot right onto the trail.');
+  if (legs.some((l) => l && l.straight)) toast(trace.mode === 'pick' ? 'No trail your machine can ride there, so it drew a straight line. Undo, or drag the dot onto a trail.'
+    : 'No trail there, so it drew a straight line. Undo, or drag the dot right onto the trail.');
 }
 window.traceAdd = (latlng) => {
   remember();
@@ -202,6 +209,18 @@ map.on('zoomend', () => { if (trace.on) drawTrace(); });
 function traceMeters() { return trace.legs.reduce((s, l) => s + segMeters(l.coords), 0); }
 function updateTraceBar() {
   const n = trace.pts.length;
+  $('#btn-trace-save').textContent = trace.mode === 'pick' ? 'Done' : 'Save';
+  if (trace.mode === 'pick') {
+    const mi = traceMeters() / 1609.344;
+    $('#trace-text').textContent = n === 0 ? "Tap where you'll start" : n === 1 ? "Tap where you'll end"
+      : `${mi.toFixed(1)} mi · about ${rideTimeText(mi, true)}`;
+    $('#trace-sub').textContent = n === 0 ? 'It follows the trails your machine can ride'
+      : n === 1 ? 'Tap points along the way to steer it onto the loop you want'
+        : 'Drag a dot to move it · tap a dot to remove it';
+    $('#btn-trace-undo').disabled = !trace.hist.length;
+    $('#btn-trace-save').disabled = n < 2;
+    return;
+  }
   // keep these short: a taller bar covers more map
   $('#trace-text').textContent = n === 0 ? 'Tap where this section starts'
     : n === 1 ? 'Tap where it ends'
@@ -226,6 +245,11 @@ $('#btn-trace-save').addEventListener('click', async () => {
   for (const leg of trace.legs) for (const c of leg.coords) {
     const last = pts[pts.length - 1];
     if (!last || last[0] !== c[0] || last[1] !== c[1]) pts.push(c);
+  }
+  if (trace.mode === 'pick') {
+    const dots = trace.pts.map(([lat, lng]) => [+lat.toFixed(6), +lng.toFixed(6)]), item = trace.pick;
+    endTrace();
+    return pickDone(pts.map(([lat, lng]) => [+lat.toFixed(6), +lng.toFixed(6)]), dots, item);
   }
   let ride = trace.ride;
   const now = Date.now();
