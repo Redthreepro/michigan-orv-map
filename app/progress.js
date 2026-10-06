@@ -218,17 +218,18 @@ function drawProgress() {
     for (const [x, y] of c.runs) lines.push(c.item.samples.slice(x, y + 1));
   }
   if (lines.length) {
-    L.polyline(lines, { renderer: riddenRenderer, color: '#3b2a00', weight: 9, opacity: 0.35, interactive: false }).addTo(riddenLayer);
-    L.polyline(lines, { renderer: riddenRenderer, color: '#ffc400', weight: 5, opacity: 0.95, interactive: false }).addTo(riddenLayer);
+    // dark border so a ridden trail never blends into a trail line of a similar color
+    L.polyline(lines, { renderer: riddenRenderer, color: '#06120a', weight: 10, opacity: 0.55, interactive: false }).addTo(riddenLayer);
+    L.polyline(lines, { renderer: riddenRenderer, color: COLORS.ridden, weight: 5, opacity: 0.95, interactive: false }).addTo(riddenLayer);
   }
   const roadLines = [];
   for (const c of progress.roadCovered || []) {
     if (!fits(c.item.f.properties)) continue;
     for (const [x, y] of c.runs) roadLines.push(c.item.samples.slice(x, y + 1));
   }
-  if (roadLines.length) L.polyline(roadLines, { renderer: riddenRenderer, color: '#ffc400', weight: 3, opacity: 0.85, dashArray: '1 0', interactive: false }).addTo(riddenLayer);
+  if (roadLines.length) L.polyline(roadLines, { renderer: riddenRenderer, color: COLORS.ridden, weight: 3, opacity: 0.85, dashArray: '1 0', interactive: false }).addTo(riddenLayer);
   const tracks = progress.rides.flatMap((r) => r.segs.map((s) => s.map((p) => [p[0], p[1]])));
-  if (tracks.length) L.polyline(tracks, { renderer: riddenRenderer, color: '#ff2fd0', weight: 3, opacity: 0.75, interactive: false }).addTo(allRidesLayer);
+  if (tracks.length) L.polyline(tracks, { renderer: riddenRenderer, color: COLORS.track, weight: 3, opacity: 0.75, interactive: false }).addTo(allRidesLayer);
   applyProgressLayers();
 }
 function applyProgressLayers() {

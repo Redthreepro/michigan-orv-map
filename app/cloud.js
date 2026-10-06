@@ -16,6 +16,8 @@ const FB_CONFIG = {
 };
 // local testing only: http://localhost:8765/?emu=1 talks to the Firebase emulator instead of the real project
 const FB_EMU = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]emu=1/.test(location.search);
+// Sign in with Apple: turn on after the Apple developer account is active and the Apple provider is set up in Firebase
+const APPLE_SIGNIN = false;
 const WATCH_EVERY_MS = 60000;   // send position about once a minute while riding
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I mix-ups
 
@@ -75,6 +77,15 @@ async function signInGoogle() {
     throw e;
   }
 }
+async function signInApple() {
+  const p = new firebase.auth.OAuthProvider('apple.com');
+  p.addScope('email'); p.addScope('name');
+  try { await fb.auth.signInWithPopup(p); }
+  catch (e) {
+    if (/popup-blocked|operation-not-supported|web-storage-unsupported/.test(e.code || '')) return fb.auth.signInWithRedirect(p);
+    throw e;
+  }
+}
 async function ensureName() {
   if (me && !me.displayName) {
     const n = prompt('Your name (your crew and family see this)', myName());
@@ -97,15 +108,19 @@ async function showCloud() {
   let html = '<h3 id="cloud-view">Crew &amp; Ride Watch</h3>';
   if (!me) {
     html += `<p class="hint">Sign in to share your rides live with family at home, and to ride as a crew: combined trail progress and shared trail reports. Your rides stay on your phone either way.</p>
+      ${APPLE_SIGNIN ? '<button class="primary apple" data-a="apple">Continue with Apple</button>' : ''}
       <button class="primary" data-a="google">Continue with Google</button>
       <h2>Or with email</h2>
       <input id="cl-email" class="field" type="email" placeholder="Email" autocomplete="email">
       <input id="cl-pass" class="field" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
       <div class="rec-row"><button class="ghost" data-a="signin">Sign in</button><button class="ghost" data-a="create">Create account</button></div>
-      <button class="link-btn" data-a="forgot">Forgot password?</button>`;
+      <button class="link-btn" data-a="forgot">Forgot password?</button>
+      <p class="hint">By signing in you agree to the <a href="privacy.html" target="_blank" rel="noopener">terms and privacy policy</a>.</p>`;
   } else {
     html += `<p class="hint">Signed in as <b>${esc(myName())}</b>${me.email ? ` (${esc(me.email)})` : ''} · <button class="link-btn" data-a="rename">Change name</button> · <button class="link-btn" data-a="signout">Sign out</button></p>`;
     html += watchHtml() + crewHtml();
+    html += `<h2>Account</h2><p class="hint"><a href="privacy.html" target="_blank" rel="noopener">Privacy policy &amp; terms</a></p>
+      <button class="ghost danger" data-a="delete-account">Delete my account</button>`;
   }
   $('#sheet-body').innerHTML = html;
   $('#sheet-body').onclick = cloudClick;
@@ -122,6 +137,7 @@ async function cloudClick(e) {
   const a = b.dataset.a;
   try {
     if (a === 'google') { await signInGoogle(); await ensureName(); }
+    if (a === 'apple') { await signInApple(); await ensureName(); }
     if (a === 'signin' || a === 'create') {
       const em = $('#cl-email').value.trim(), pw = $('#cl-pass').value;
       if (!em || !pw) return toast('Enter your email and a password');
@@ -136,6 +152,7 @@ async function cloudClick(e) {
     }
     if (a === 'rename') { const n = prompt('Your name (your crew and family see this)', myName()); if (n && n.trim()) { await me.updateProfile({ displayName: n.trim().slice(0, 40) }); await renameEverywhere(); } }
     if (a === 'signout') { if (!confirm('Sign out? Live sharing and crew sync stop until you sign in again.')) return; await stopWatch('ended'); await fb.auth.signOut(); }
+    if (a === 'delete-account') return deleteAccount();
     if (a === 'watch-setup') await setupWatch();
     if (a === 'watch-send') await sendWatchLink();
     if (a === 'watch-now') { if (window.isRecording && isRecording()) await beginWatch(currentRide()); }
@@ -148,6 +165,53 @@ async function cloudClick(e) {
     if (a === 'trip-del') { const t = C.trips.find((x) => x.id === b.dataset.id); if (t && confirm(`Remove "${t.name}" for the whole crew?`)) await fb.db.collection('crews').doc(C.code).collection('trips').doc(t.id).delete(); }
     if (a === 'crew-leave') { if (confirm('Leave this crew? Your rides stay on your phone.')) await leaveCrew(); }
   } catch (err) { toast(cloudErr(err)); }
+  showCloud();
+}
+
+// ---------- delete my account (App Store rule: deleting has to be possible from inside the app) ----------
+async function deleteAccount() {
+  if (!confirm('Delete your account? This removes everything of yours online: your family link, your crew progress, trail reports, photos and shared rides. Your rides and waypoints on this phone stay.')) return;
+  if (!confirm('Are you sure? This can\'t be undone.')) return;
+  toast('Deleting…');
+  const uid = me.uid, db = fb.db;
+  try {
+    if (W.id) {
+      await stopWatch('ended');
+      const ref = db.collection('watch').doc(W.id);
+      for (const d of (await ref.collection('pts').get()).docs) await d.ref.delete();
+      await ref.delete();
+      W.id = null; store.set('watchId', null);
+    }
+    if (C.code) {
+      const crew = db.collection('crews').doc(C.code);
+      const mine = await crew.collection('reports').where('by', '==', uid).get();
+      for (const d of mine.docs) {
+        for (const pid of d.data().photos || []) await crew.collection('photos').doc(pid).delete().catch(() => {});
+        await d.ref.delete();
+      }
+      for (const d of (await crew.collection('trips').where('by', '==', uid).get()).docs) await d.ref.delete();
+      await crew.collection('ridden').doc(uid).delete().catch(() => {});
+      const cd = (await crew.get()).data();
+      const others = Object.keys((cd && cd.members) || {}).filter((m) => m !== uid);
+      if (cd && cd.owner === uid) {
+        // hand the crew to someone else, or remove it if you were the only one
+        if (others.length) await crew.update({ owner: others[0], ['members.' + uid]: fb.FV.delete() });
+        else await crew.delete();
+      } else await crew.update({ ['members.' + uid]: fb.FV.delete() });
+      stopCrew();
+      C.code = null; store.set('crew', null); C.doc = null; C.ridden.clear(); C.reports = []; C.trips = [];
+      drawCrew(); drawCrewReports(); refreshTripChip();
+    }
+  } catch (err) { toast('Could not remove everything (' + cloudErr(err) + '). Try again with signal.'); return; }
+  try {
+    await me.delete();
+    toast('Your account and online data are deleted');
+  } catch (e) {
+    if ((e.code || '').includes('requires-recent-login')) {
+      await fb.auth.signOut();
+      toast('Your online data is removed. To finish, sign in once more and tap Delete my account again (a safety check).');
+    } else toast(cloudErr(e));
+  }
   showCloud();
 }
 
@@ -291,7 +355,7 @@ function crewHtml() {
   h += `<p><b>${esc(d ? d.name : 'Loading…')}</b> · code <b class="crew-code">${esc(C.code)}</b></p>
     ${cs ? `<p class="hint">Together: ${fmtMi(cs.riddenM)} of ${fmtMi(cs.totalM)} ridden (${fmtPct(pct(cs.riddenM, cs.totalM))})</p>` : ''}
     <ul class="along">${members.map(([uid, n]) => { const r = C.ridden.get(uid); return `<li><b>${esc(n)}${me && uid === me.uid ? ' (you)' : ''}</b><small>${r && r.mi != null ? fmtMi(r.mi * 1609.344) + ' ridden' : 'no rides shared yet'}</small></li>`; }).join('')}</ul>
-    <label class="row"><input type="checkbox" id="cl-crewmap" ${shown.crew ? 'checked' : ''}> Show the crew's ridden trails on the map (teal)</label>
+    <label class="row"><input type="checkbox" id="cl-crewmap" ${shown.crew ? 'checked' : ''}> Show the crew's ridden trails on the map</label>
     ${crewTripsHtml()}
     <div class="rec-row"><button class="ghost" data-a="crew-send">Send the code</button><button class="ghost danger" data-a="crew-leave">Leave crew</button></div>`;
   return h;
@@ -441,9 +505,10 @@ function drawCrew() {
       if (i < h.length && h[i]) { if (start < 0) start = i; } else if (start >= 0) { if (i - start >= 2) lines.push(it.samples.slice(start, i)); start = -1; }
     }
   }
-  if (lines.length) L.polyline(lines, { renderer: crewRenderer, color: '#19c3b0', weight: 9, opacity: 0.55, interactive: false }).addTo(crewLayer);
+  if (lines.length) L.polyline(lines, { renderer: crewRenderer, color: COLORS.crew, weight: 9, opacity: 0.55, interactive: false }).addTo(crewLayer);
   crewLayer.addTo(map);
 }
+window.drawCrewLayer = drawCrew;
 if (shown.crew === undefined) shown.crew = 1;
 const crewBox = document.querySelector('[data-kind="crew"]');
 if (crewBox) { crewBox.checked = !!shown.crew; crewBox.addEventListener('change', drawCrew); }

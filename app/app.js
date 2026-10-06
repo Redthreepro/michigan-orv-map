@@ -111,7 +111,7 @@ function styleFor(f) {
     dashArray: p.sub === 'trail' ? '2 5' : p.sea ? '6 5' : null };
   if (p.t === 'reroute') return { color: KIND.reroute.color, weight: w + 1, dashArray: '8 6', opacity: 1 };
   return {
-    color: isClosed(p) ? KIND.closure.color : KIND[p.t].color,
+    color: isClosed(p) ? KIND.closure.color : window.colorFor ? colorFor(p) : KIND[p.t].color,
     weight: w,
     opacity: 0.95,
     dashArray: p.t === 'mc' || p.t === 'mccct' ? '1 0' : null,
@@ -484,7 +484,7 @@ rangeInput.addEventListener('change', () => {
 
 // Layers panel: remember which groups are open and show "N of M on" on each group
 function updateGroupCounts() {
-  document.querySelectorAll('#panel-layers .grp').forEach((g) => {
+  document.querySelectorAll('#panel-layers .grp:not(.nocount)').forEach((g) => {
     const boxes = [...g.querySelectorAll('input[type=checkbox]')];
     g.querySelector('.grp-count').textContent = `${boxes.filter((b) => b.checked).length} of ${boxes.length} on`;
   });

@@ -1,7 +1,7 @@
 'use strict';
 // Ride recording: shares the GPS watch from app.js, stores rides in IndexedDB, exports GPX.
 
-const TRACK_COLOR = '#ff2fd0';
+const trackColor = () => (window.COLORS && COLORS.track) || '#ff2fd0';
 const MIN_MOVE_M = 4;       // ignore GPS jitter smaller than this
 const MAX_ACC_M = 40;       // ignore fixes worse than this
 
@@ -70,7 +70,7 @@ window.rideStartPoint = () => { const p = rec && rec.segs.find((s) => s.length);
 function recLatLngs() { return rec.segs.map((s) => s.map((p) => [p[0], p[1]])); }
 function drawRec() {
   if (!rec) { if (recLine) { map.removeLayer(recLine); recLine = null; } return; }
-  if (!recLine) recLine = L.polyline([], { renderer, color: TRACK_COLOR, weight: 5, opacity: 0.9, interactive: false }).addTo(map);
+  if (!recLine) recLine = L.polyline([], { renderer, color: trackColor(), weight: 5, opacity: 0.9, interactive: false }).addTo(map);
   recLine.setLatLngs(recLatLngs());
   recLine.bringToFront();
 }
@@ -294,13 +294,13 @@ const shownTracks = new Map();
 
 function showTrack(t, fit = true) {
   if (!shownTracks.has(t.id)) {
-    const line = L.polyline(t.segs.map((s) => s.map((p) => [p[0], p[1]])), { renderer, color: TRACK_COLOR, weight: 5, opacity: 0.85 })
+    const line = L.polyline(t.segs.map((s) => s.map((p) => [p[0], p[1]])), { renderer, color: trackColor(), weight: 5, opacity: 0.85 })
       .on('click', (e) => { L.DomEvent.stop(e); if (window.traceMode && traceMode()) return traceAdd(e.latlng); renderList(); openSheet('#panel-rides'); });
     const group = L.featureGroup([line]);
     // a merged ride: a white dot where each original ride starts, so you can see where they join
     (t.parts || []).slice(1).forEach((p) => {
       const s = t.segs[p.from], pt = s && s[0];
-      if (pt) L.circleMarker([pt[0], pt[1]], { renderer, radius: 6, color: TRACK_COLOR, weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(group);
+      if (pt) L.circleMarker([pt[0], pt[1]], { renderer, radius: 6, color: trackColor(), weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(group);
     });
     group.addTo(map);
     shownTracks.set(t.id, group);
@@ -308,6 +308,10 @@ function showTrack(t, fit = true) {
   const b = shownTracks.get(t.id).getBounds();
   if (fit && b.isValid()) map.fitBounds(b, { padding: [40, 40] });
 }
+window.recolorTracks = () => {
+  for (const g of shownTracks.values()) g.setStyle({ color: trackColor() });
+  if (recLine) recLine.setStyle({ color: trackColor() });
+};
 function hideTrack(id) {
   const l = shownTracks.get(id);
   if (l) { map.removeLayer(l); shownTracks.delete(id); }
