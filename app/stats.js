@@ -115,13 +115,21 @@ async function shareRideCard(t) {
   const blob = await rideCardBlob(t);
   const name = t.name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') + '.jpg';
   const file = new File([blob], name, { type: 'image/jpeg' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: t.name }); return; } catch (e) { if (e.name === 'AbortError') return; }
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(file); a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  const url = URL.createObjectURL(blob);
+  // the phone only opens its share sheet straight from a tap, so the picture is made first, then you tap Share
+  $('#sheet-body').innerHTML = `<h3>Ride card</h3><img class="card-preview" src="${url}" alt="Ride card for ${esc(t.name)}">
+    <button class="primary" data-a="share">Share</button>
+    <p class="hint">Or press and hold the picture to save it to your photos.</p>`;
+  $('#sheet-body').onclick = async (e) => {
+    if (e.target.closest('button')?.dataset.a !== 'share') return;
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: t.name }); return; } catch (err) { if (err.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  openSheet('#sheet');
 }
 window.shareRideCard = shareRideCard;
 window.rideCardBlob = rideCardBlob;
@@ -159,10 +167,26 @@ function goalNow() {
   const g = goalSummary();
   return { done: g.done.length, pct: g.totalM ? (100 * g.riddenM) / g.totalM : 0, near: g.list.filter((x) => x.riddenM >= x.totalM * 0.5 && x.riddenM < x.totalM * 0.9), doneList: g.done };
 }
+// the trail-goal numbers for just these rides (for "what did this ride unlock")
+function goalFor(rides) {
+  const cov = new Map((rides.length ? coverItems(prepGoal(), rideIndex(rides)) : []).map((c) => [c.item, c.riddenM]));
+  const sys = new Map();
+  let total = 0, ridden = 0;
+  for (const it of prepGoal()) {
+    const p = it.f.properties;
+    if (!fits(p)) continue;
+    const key = p.t + '|' + (p.n || p.t);
+    const s = sys.get(key) || { t: 0, r: 0 };
+    const m = cov.get(it) || 0;
+    s.t += it.lenM; s.r += m; total += it.lenM; ridden += m;
+    sys.set(key, s);
+  }
+  return { done: [...sys.values()].filter((s) => s.r >= s.t * 0.9).length, pct: total ? (100 * ridden) / total : 0 };
+}
 function earnedKeys(rides) {
   const year = new Date().getFullYear();
   const all = summarizeRides(rides), season = summarizeRides(rides.filter((t) => new Date(t.start).getFullYear() === year));
-  return new Set(milestoneDefs(season, all, goalNow()).filter(([, , v, n]) => v >= n).map(([k]) => k));
+  return new Set(milestoneDefs(season, all, goalFor(rides)).filter(([, , v, n]) => v >= n).map(([k]) => k));
 }
 
 let statsYear = null;
@@ -222,6 +246,6 @@ window.newMilestonesHtml = async (ride) => {
   const after = earnedKeys(rides);
   const year = new Date().getFullYear();
   const all = summarizeRides(rides), season = summarizeRides(rides.filter((t) => new Date(t.start).getFullYear() === year));
-  const fresh = milestoneDefs(season, all, goalNow()).filter(([k]) => after.has(k) && !before.has(k));
+  const fresh = milestoneDefs(season, all, goalFor(rides)).filter(([k]) => after.has(k) && !before.has(k));
   return fresh.length ? `<div class="milestone-new">${fresh.map(([, l]) => `<b>New milestone: ${esc(l)}!</b>`).join('')}</div>` : '';
 };

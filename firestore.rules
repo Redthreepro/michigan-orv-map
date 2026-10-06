@@ -12,7 +12,7 @@ service cloud.firestore {
 
       // GPS points, sent in small batches (and caught up after a dead zone)
       match /pts/{p} {
-        allow read: if true;
+        allow read: if exists(/databases/$(db)/documents/watch/$(id));
         allow create, delete: if request.auth != null
           && get(/databases/$(db)/documents/watch/$(id)).data.owner == request.auth.uid;
       }
@@ -44,7 +44,9 @@ service cloud.firestore {
       match /reports/{rid} {
         allow read: if isMember();
         allow create: if isMember() && request.resource.data.by == request.auth.uid;
-        allow update, delete: if isMember();
+        // only the person who reported it can change it; anyone in the crew can mark it cleared
+        allow update: if isMember() && resource.data.by == request.auth.uid && request.resource.data.by == request.auth.uid;
+        allow delete: if isMember();
       }
       // report photos, shrunk on the phone and stored as text (keeps the project on the free plan)
       match /photos/{pid} {

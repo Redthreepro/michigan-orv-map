@@ -288,6 +288,7 @@ a { color: #6fa8ff; }
 .board .nums { text-align: right; }
 .board .nums b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
 .board-sort { margin-top: 4px; }
+.card-preview { width: 100%; border-radius: 12px; display: block; margin: 6px 0; }
 .cloud-btn { color: #7fd8ff; border-color: #7fd8ff66; }
 .link-btn { background: none; border: 0; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
 .crew-code { font-size: 20px; letter-spacing: .12em; }

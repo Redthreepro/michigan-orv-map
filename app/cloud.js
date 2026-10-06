@@ -93,6 +93,11 @@ async function ensureName() {
   }
 }
 function onUserChanged() {
+  if (me && store.get('cloudUid', null) && store.get('cloudUid', null) !== me.uid) {
+    W.id = null; W.active = false; store.set('watchId', null); store.set('watchRide', null); store.set('sosSent', 0);
+    C.code = null; store.set('crew', null);
+  }
+  if (me) store.set('cloudUid', me.uid);
   if (me) { startCrew(); resumeWatch(); } else { stopCrew(); }
   refreshCloudSheet();
 }
@@ -178,9 +183,7 @@ async function deleteAccount() {
   try {
     if (W.id) {
       await stopWatch('ended');
-      const ref = db.collection('watch').doc(W.id);
-      for (const d of (await ref.collection('pts').get()).docs) await d.ref.delete();
-      await ref.delete();
+      await deleteWatch(W.id);
       W.id = null; store.set('watchId', null);
     }
     if (C.code) {
@@ -234,13 +237,25 @@ function watchHtml() {
     <div class="rec-row">${W.active ? '<button class="ghost" data-a="watch-stop">Stop sharing this ride</button>' : riding ? '<button class="ghost" data-a="watch-now">Share this ride now</button>' : ''}<button class="ghost" data-a="watch-new">Make a new link</button></div>`;
   return h;
 }
+async function deleteWatch(id) {
+  const ref = fb.db.collection('watch').doc(id);
+  for (const d of (await ref.collection('pts').get()).docs) await d.ref.delete();
+  await ref.delete();
+}
+// points from earlier rides on this link aren't needed: the family map only shows the current ride
+async function purgeOldPoints(keep) {
+  try {
+    const q = await fb.db.collection('watch').doc(W.id).collection('pts').get();
+    for (const d of q.docs) if (d.data().rideKey !== keep) d.ref.delete().catch(() => {});
+  } catch {}
+}
 async function setupWatch(fresh) {
-  if (W.id && fresh) { try { await fb.db.collection('watch').doc(W.id).delete(); } catch {} }
+  if (W.id && fresh) { try { await deleteWatch(W.id); } catch {} }
   W.id = randomId(20);
   await fb.db.collection('watch').doc(W.id).set({ owner: me.uid, name: myName(), status: 'idle', created: Date.now() });
   store.set('watchId', W.id);
   if (window.isRecording && isRecording() && W.auto) await beginWatch(currentRide());
-  await sendWatchLink();
+  toast('Your family link is ready. Tap "Send my family link".');
 }
 async function sendWatchLink() {
   const url = watchUrl(), text = `Follow my ORV rides live (opens a map): ${url}`;
@@ -264,8 +279,12 @@ async function beginWatch(rec) {
   await cloud();
   W.active = true; W.rideKey = rec.id; W.buf = [];
   store.set('watchRide', rec.id);
+  const sos = !!store.get('sosSent', 0);
+  // merge, so an emergency alert already on the link survives the new ride starting
   await fb.db.collection('watch').doc(W.id).set({ owner: me.uid, name: myName(), title: rec.name, rideKey: rec.id, started: rec.start,
-    status: rec.paused ? 'paused' : 'riding', statusAt: Date.now(), plan: planLine(), mi: 0, mph: 0, last: null, sent: Date.now() }).catch(() => {});
+    ...(sos ? {} : { status: rec.paused ? 'paused' : 'riding', statusAt: Date.now() }), plan: planLine(), mi: 0, mph: 0, last: null,
+    ended: fb.FV.delete(), sent: Date.now() }, { merge: true }).catch(() => {});
+  purgeOldPoints(rec.id);
   clearInterval(W.timer);
   W.timer = setInterval(flushWatch, WATCH_EVERY_MS);
   W.sentAt = Date.now();
@@ -275,6 +294,8 @@ async function flushWatch(extra) {
   const ref = fb.db.collection('watch').doc(W.id);
   const rec = currentRide();
   const upd = { sent: Date.now(), ...(extra || {}) };
+  // while an emergency alert is up, only "I'm OK" (cloudSOSClear) may change the status
+  if (store.get('sosSent', 0) && upd.status !== 'sos') { delete upd.status; delete upd.statusAt; }
   if (W.fix) upd.last = W.fix;
   if (rec) {
     const s = stats(rec);
@@ -369,7 +390,7 @@ async function createCrew() {
   await fb.db.collection('crews').doc(code).set({ name: name.trim().slice(0, 60), owner: me.uid, members: { [me.uid]: myName() }, created: Date.now() });
   C.code = code; store.set('crew', code);
   startCrew();
-  await sendCrewCode();
+  toast('Crew started. Tap "Send the code" to invite your riders.');
 }
 async function joinCrew() {
   const code = (prompt('Crew code') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -408,7 +429,10 @@ function startCrew() {
   const ref = fb.db.collection('crews').doc(C.code);
   C.unsub.push(ref.onSnapshot((s) => {
     C.doc = s.exists ? s.data() : null;
-    if (s.exists && !(me.uid in (C.doc.members || {}))) { C.code = null; store.set('crew', null); stopCrew(); } // removed from the crew
+    if (s.exists && !(me.uid in (C.doc.members || {}))) { // removed from the crew
+      stopCrew(); C.code = null; store.set('crew', null); C.doc = null; C.ridden.clear(); C.reports = []; C.trips = [];
+      drawCrew(); drawCrewReports(); refreshTripChip();
+    }
     refreshCloudSheet();
   }, () => {}));
   C.unsub.push(ref.collection('ridden').onSnapshot((q) => {
@@ -622,7 +646,7 @@ function showCrewReport(r) {
       // keep a copy of the photos on this phone too
       const photos = [];
       for (const [id, d] of Object.entries(shots)) { const blob = await (await fetch(d)).blob(); await putPhoto({ id, blob, thumb: blob, at: Date.now() }); photos.push(id); }
-      await tx('readwrite', (s) => s.put({ id: 'w' + Date.now(), lat: r.lat, lng: r.lng, name: label, type: 'report', r: r.r, at: r.at, note: r.note || '', photos }), 'waypoints');
+      await tx('readwrite', (s) => s.put({ id: 'w' + Date.now(), lat: r.lat, lng: r.lng, name: label, type: 'report', r: r.r, at: r.at, note: r.note || '', photos, crewOf: r.id }), 'waypoints');
       await loadWaypoints(); closeSheets(); toast('Saved');
     }
     if (a === 'cleared') {
@@ -638,7 +662,7 @@ const CREW_PHOTO_MAX = 3;    // photos shared per report
 const toDataUrl = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
 window.crewReportsList = () => (C.code ? C.reports.filter((r) => !me || r.by !== me.uid) : []);
 window.cloudReport = async (wp) => {
-  if (!C.code || !me || !fb || wp.type !== 'report') return;
+  if (!C.code || !me || !fb || wp.type !== 'report' || wp.crewOf) return;
   const crew = fb.db.collection('crews').doc(C.code);
   const ids = (wp.photos || []).slice(0, CREW_PHOTO_MAX);
   for (const id of ids) {
@@ -653,7 +677,7 @@ window.cloudReport = async (wp) => {
     by: me.uid, byName: myName(), photos: ids }).catch(() => {});
 };
 window.cloudReportGone = (wp) => {
-  if (!C.code || !me || !fb || wp.type !== 'report') return;
+  if (!C.code || !me || !fb || wp.type !== 'report' || wp.crewOf) return;
   const crew = fb.db.collection('crews').doc(C.code);
   for (const id of wp.photos || []) crew.collection('photos').doc(id).delete().catch(() => {});
   crew.collection('reports').doc(wp.id).delete().catch(() => {});
