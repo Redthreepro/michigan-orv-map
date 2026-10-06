@@ -504,6 +504,8 @@ map.on('contextmenu', (e) => {
   showSignal();
   const ct = window.countyRoadText ? countyRoadText(e.latlng.lat, e.latlng.lng) : '';
   $('#point-county').hidden = !ct; $('#point-county').textContent = ct;
+  const src = ct && window.countySource ? countySource(e.latlng.lat, e.latlng.lng) : null;
+  if (src && /^https:\/\//.test(src)) { const a = document.createElement('a'); a.href = src; a.target = '_blank'; a.rel = 'noopener'; a.textContent = ' Source'; $('#point-county').appendChild(a); }
   if (window.loadCoverage && window.signalAt && signalAt(0, 0) === null) loadCoverage().then(showSignal);
   openSheet('#panel-point');
 });

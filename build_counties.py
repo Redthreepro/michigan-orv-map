@@ -52,7 +52,36 @@ VERIFIED = {
     "Newaygo": ("open", "County ordinance: far right of the maintained portion of the road.", "2026",
                 "https://www.newaygocountymi.gov/departments/county-sherrif/county-orv-ordinance/"),
     "Oceana": ("partial", "Township-by-township; see the county's ordinance list.", "2026", "https://oceana.mi.us/courts-sheriff/orv-ordinances/"),
+    "Wexford": ("open", "Unpaved county roads (far right); on paved ones only the gravel/dirt shoulder. Not in Buckley, Cadillac, Harrietta, Manton or Mesick unless the town allows it. 25 mph, lights on, 12 and older.",
+                "Apr 2009", "https://wexfordcounty.org/wp-content/uploads/2018/02/ORV-Ordinance-41.pdf"),
+    "Osceola": ("open", "Far right of any county road; never on state or federal highways. 25 mph, lights on, 12 and older; townships may close roads.",
+                "Nov 2008", "https://www.vvmapping.com/trails/MICounties/ordinances/Osceola_ORV_Ordinance.pdf"),
+    "Manistee": ("partial", "Township by township: Arcadia, Bear Lake, Brown, Cleon, Dickson, Filer, Manistee, Maple Grove, Norman, Onekama, Pleasanton, Springdale (and Marilla), plus Copemish, Kaleva and Onekama villages. Mostly daylight hours, 20-25 mph, some roads closed or seasonal.",
+                 "Oct 2023", "https://manisteecountymi.gov/DocumentCenter/View/2153/ORV-Road-Allowance-Manual-as-of-October-23-2023-PDF"),
+    "Mecosta": ("open", "Far right of county roads; never on state or federal highways. 25 mph, lights on, 12 and older; under 18 needs a license or certificate plus an adult.",
+                "Sep 2011", "https://www.mecostacounty.org/sheriff/Forms/MC-ORVOrdinance.pdf"),
+    "Missaukee": ("open", "Far right of county roads; never on state or federal highways. 25 mph, lights on, 12 and older.", "Oct 2008",
+                  "https://www.missaukee.org/Document_center/How%20do%20i/County%20Ordinances/2008-1_ORV_ORDINANCE.pdf"),
+    "Kalkaska": ("open", "Far right of county roads; never on state or federal highways. 25 mph, lights on, 12 and older.", "Apr 2009",
+                 "https://www.kalkaskasheriff.net/Document_Center/Laws%20and%20Ordinances/Kalkaska_ORV_Ord.pdf"),
+    "Clare": ("open", "Far right of county roads; never on state or federal highways. 25 mph, lights on, 12 and older. Some local roads may be closed by townships.",
+              "Sep 2012", "https://clareco.net/wp-content/uploads/2025/05/ORV-Ordinance-22A.pdf"),
+    "Crawford": ("mostly", "All county roads in Beaver Creek, Frederic, Grayling and Maple Forest townships; South Branch except about 13 roads; Lovells only on 19 listed roads. Never on M-18, M-72, M-93, I-75, US-127 or parts of Hartwick Pines Rd / W. Federal Hwy. 25 mph, 12 and older.",
+                 "Sep 2015", "https://crawfordco.org/wp-content/uploads/2017/02/ORV-ordinance-Final-09242015-revised.pdf"),
+    "Roscommon": ("open", "All county roads and streets, far right; never on M-18, M-55, US-127 or I-75. 25 mph, 12 and older. A residential-area curfew was under review in 2026.",
+                  "2020", "https://www.roscommoncounty.net/DocumentCenter/View/789"),
+    "Montcalm": ("open", "County roads, far right; not on state trunklines or city/village streets unless the town allows it. 25 mph, 12 and older. The county ordinance does not cover motorcycles (dirt bikes) or 3-wheelers.",
+                 "Oct 2025", "https://www.montcalm.us/DocumentCenter/View/5559/ORV-Ordinance-Updated-101325"),
+    "Grand Traverse": ("mostly", "Open countywide except state/federal roads, all of Garfield and Acme townships, and a few listed roads (e.g. Peninsula Dr, East Shore Rd, part of Bluff Rd, Garfield Rd). 25 mph, 12 and older.",
+                       "Oct 2025", "https://www.gtcountymi.gov/DocumentCenter/View/17768/Off-Road-Vehicle-Ordinance-_6"),
 }
+# reported from news coverage, not an official page (shown as "reported", not "ordinance")
+REPORTED = {
+    "Mason": ("mostly", "No county ordinance; every city, village and township has its own. Usually daylight only, 25 mph, far right of the paved lane. Never on US-10, US-31, M-116 or S. Pere Marquette Hwy (crossing is OK).",
+              "Jul 2024", "https://www.masoncountypress.com/?p=90313"),
+}
+NO_BIKES = {"Montcalm"}  # ordinance covers 4-wheel ORVs only
+
 
 
 def main():
@@ -66,10 +95,14 @@ def main():
         st, note, upd, src = "none", "No county-wide ORV ordinance reported", "", LIST_SRC
         if name in STATUS:
             st, note, upd = STATUS[name]; src = LIST_SRC
+        if name in REPORTED:
+            st, note, upd, src = REPORTED[name]
         if name in VERIFIED:
             st, note, upd, src = VERIFIED[name]
-        feats.append({"type": "Feature", "geometry": f["geometry"],
-                      "properties": {"n": name, "st": st, "note": note, "upd": upd, "src": src, "ok": 1 if name in VERIFIED else 0}})
+        props = {"n": name, "st": st, "note": note, "upd": upd, "src": src, "ok": 1 if name in VERIFIED else 0}
+        if name in NO_BIKES:
+            props["nobike"] = 1
+        feats.append({"type": "Feature", "geometry": f["geometry"], "properties": props})
     OUT.write_text(json.dumps({"type": "FeatureCollection", "features": feats}, separators=(",", ":")), encoding="utf-8")
     counts = {}
     for f in feats:
