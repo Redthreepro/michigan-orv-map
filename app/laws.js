@@ -40,7 +40,7 @@ function lawsHtml() {
   html += sec('Where you can ride', `<ul class="law-list">
     <li><b>DNR trail types:</b> motorcycle trails (24"), ORV/ATV trails (50"), and ORV routes (72" and wider). It's illegal to take a machine wider than 50" on a forest trail. This map already hides what yours can't use.</li>
     <li><b>State forest roads</b> marked open to ORVs, and national forest roads shown open on the Forest Service map (they have open dates).</li>
-    <li><b>County roads only where the county or township has passed an ordinance.</b> Call the county sheriff to check before riding a road. Where it's allowed: far right, with traffic, single file, <b>25 mph max</b>, lights on.</li>
+    <li><b>County roads only where the county or township has passed an ordinance.</b> Turn on <b>County roads open to ORVs</b> in Layers to see each county's reported status, and call the county sheriff to confirm before riding a road. Where it's allowed: far right, with traffic, single file, <b>25 mph max</b>, lights on.</li>
     <li><b>Never on M- or US- highways,</b> except posted ORV connector routes.</li>
     <li><b>Not in streams, rivers, wetlands or swamps</b> except over a bridge or culvert. Not off the trail in state parks, game areas or recreation areas.</li>
     <li><b>Private land</b> only with the owner's written permission.</li></ul>`);

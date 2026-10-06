@@ -254,7 +254,7 @@ function showDetail(f, clicked, latlng) {
   const rows = [
     ['Allowed', p.lim === 24 ? 'Motorcycles only' : p.lim >= 999 ? 'Any size ORV' : p.lim ? `Machines up to ${p.lim}" wide` : null], ['Trail width', p.w], ['Surface', p.sf], ['Length', total ? total.toFixed(1) + ' mi' : null],
     ['Ride time', total ? `About ${rideTimeText(total)} at ${RIDE_MPH[0]}–${RIDE_MPH[1]} mph` : null],
-    ['County', p.co], ['Runs on', p.rd],
+    ['County', p.co], ['County roads', p.co && window.countyRoadShort ? countyRoadShort(p.co) : null], ['Runs on', p.rd],
     ['Hunting land', p.hl ? 'Public. Nov 15–30: no riding 7–11 a.m. and 2–5 p.m.' : null],
     ['Open', p.t === 'nf' ? (p.dates ? fmtDates(p.dates) : 'All year') : null], ['Forest', p.forest ? p.forest + ' National Forest' : null],
   ].filter(([, v]) => v);
@@ -267,12 +267,14 @@ function showDetail(f, clicked, latlng) {
   if (p.t === 'nf') html += `<div class="note">From the U.S. Forest Service Motor Vehicle Use Map. National forest rules apply. Follow posted signs.</div>`;
   if (p.mil) html += `<div class="note restrict">Camp Grayling military road. May close without notice for training. Check Camp Grayling's Facebook page before riding.</div>`;
   if (p.c) html += `<div class="note">${esc(p.c)}</div>`;
+  html += '<p class="hint" id="trail-rain"></p>';
   html += `<div class="rec-row"><button class="primary" id="btn-detail-route">Route here</button><button class="ghost" id="btn-detail-trip">Add to trip</button></div>`;
   const sel = selDetail(f); // stays highlighted after this sheet closes
   html += sel.html;
   $('#sheet-body').onclick = null;
   $('#sheet-body').innerHTML = html;
   sel.wire();
+  if (window.fillRainAt) { const at = latlng || (clicked.getCenter ? clicked.getCenter() : clicked.getBounds().getCenter()); fillRainAt(at.lat, at.lng); }
   const target = latlng || (clicked.getCenter ? clicked.getCenter() : clicked.getBounds().getCenter());
   const label = p.n || KIND[p.t].label;
   $('#btn-detail-route').addEventListener('click', () => window.routeHere && window.routeHere(target, label));

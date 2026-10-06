@@ -259,6 +259,10 @@ a { color: #6fa8ff; }
 .loop-list li > div { min-width: 0; }
 .loop-list b, .loop-list small { display: block; }
 .loop-sw { flex: none; width: 14px; height: 14px; border-radius: 50%; margin-top: 4px; }
+.sw.county { height: 12px; background: #2fbf4a33; border: 1.5px solid #2fbf4a; }
+.mud { display: flex; flex-direction: column; gap: 2px; border-radius: 10px; padding: 10px 12px; margin: 8px 0; background: var(--bg); border-left: 4px solid #2fbf4a; }
+.mud span { font-size: 14px; }
+.mud-1 { border-left-color: #9ccc65; } .mud-2 { border-left-color: #ffd400; } .mud-3 { border-left-color: #ff8c00; background: #ff8c0018; }
 .cloud-btn { color: #7fd8ff; border-color: #7fd8ff66; }
 .link-btn { background: none; border: 0; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
 .crew-code { font-size: 20px; letter-spacing: .12em; }

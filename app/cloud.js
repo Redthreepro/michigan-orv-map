@@ -606,6 +606,7 @@ function showCrewReport(r) {
 // my reports -> the crew (and removing one clears it for everyone)
 const CREW_PHOTO_MAX = 3;    // photos shared per report
 const toDataUrl = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+window.crewReportsList = () => (C.code ? C.reports.filter((r) => !me || r.by !== me.uid) : []);
 window.cloudReport = async (wp) => {
   if (!C.code || !me || !fb || wp.type !== 'report') return;
   const crew = fb.db.collection('crews').doc(C.code);

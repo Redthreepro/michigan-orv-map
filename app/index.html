@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=49">
+<link rel="stylesheet" href="style.css?v=50">
 </head>
 <body>
 <div id="map"></div>
@@ -127,6 +127,7 @@
     <label class="row"><input type="checkbox" data-kind="closed" checked><i class="sw closed"></i>Closures &amp; reroutes</label>
     <label class="row"><input type="checkbox" data-kind="scramble" checked><i class="sw scramble"></i>Scramble areas</label>
     <label class="row"><input type="checkbox" data-kind="hunt"><i class="sw hunt"></i>Public hunting land <small>deer-season hours apply</small></label>
+    <label class="row"><input type="checkbox" data-kind="county"><i class="sw county"></i>County roads open to ORVs <small>reported, by county</small></label>
   </details>
 
   <details class="grp" data-grp="places">
@@ -211,6 +212,7 @@
   <p class="hint" id="point-coords"></p>
   <p class="hint" id="point-camp" hidden></p>
   <p class="hint" id="point-signal" hidden></p>
+  <p class="hint" id="point-county" hidden></p>
   <div class="rec-row"><button id="btn-route-here" class="primary">Route here</button><button id="btn-add-trip" class="ghost">Add to trip</button></div>
   <div class="rec-row"><button id="btn-route-from" class="ghost">Start trip here</button><button id="btn-save-wp" class="ghost">Save as waypoint</button></div>
   <div class="rec-row"><button id="btn-drive" class="ghost">Drive here (Google Maps)</button><button id="btn-send-dir" class="ghost">Send directions</button></div>
@@ -329,26 +331,27 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=49"></script>
-<script src="tracks.js?v=49"></script>
-<script src="routing.js?v=49"></script>
-<script src="places.js?v=49"></script>
-<script src="plan.js?v=49"></script>
-<script src="nav.js?v=49"></script>
-<script src="offline.js?v=49"></script>
-<script src="gpx.js?v=49"></script>
-<script src="weather.js?v=49"></script>
-<script src="progress.js?v=49"></script>
-<script src="details.js?v=49"></script>
-<script src="edit.js?v=49"></script>
-<script src="select.js?v=49"></script>
-<script src="updates.js?v=49"></script>
-<script src="laws.js?v=49"></script>
-<script src="safety.js?v=49"></script>
-<script src="merge.js?v=49"></script>
-<script src="spots.js?v=49"></script>
-<script src="cloud.js?v=49"></script>
-<script src="colors.js?v=49"></script>
-<script src="loops.js?v=49"></script>
+<script src="app.js?v=50"></script>
+<script src="tracks.js?v=50"></script>
+<script src="routing.js?v=50"></script>
+<script src="places.js?v=50"></script>
+<script src="plan.js?v=50"></script>
+<script src="nav.js?v=50"></script>
+<script src="offline.js?v=50"></script>
+<script src="gpx.js?v=50"></script>
+<script src="weather.js?v=50"></script>
+<script src="progress.js?v=50"></script>
+<script src="details.js?v=50"></script>
+<script src="edit.js?v=50"></script>
+<script src="select.js?v=50"></script>
+<script src="updates.js?v=50"></script>
+<script src="laws.js?v=50"></script>
+<script src="safety.js?v=50"></script>
+<script src="merge.js?v=50"></script>
+<script src="spots.js?v=50"></script>
+<script src="cloud.js?v=50"></script>
+<script src="colors.js?v=50"></script>
+<script src="loops.js?v=50"></script>
+<script src="conditions.js?v=50"></script>
 </body>
 </html>

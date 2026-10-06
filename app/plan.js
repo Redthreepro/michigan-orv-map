@@ -186,7 +186,7 @@ function tripWarnings(gas) {
   planLegs.forEach((r, i) => {
     const a = plan.stops[i].name, b = plan.stops[i + 1].name;
     if (r.fail) w.push({ level: 'bad', text: `${r.fail === 'start' ? a : b}: no trail your machine can ride within 15 miles.`, at: r.fail === 'start' ? [r.from.lat, r.from.lng] : [r.to.lat, r.to.lng] });
-    else if (r.gap) w.push({ level: 'bad', text: `${a} → ${b} doesn't connect: ${fmtMi(r.gap.meters)} with no DNR trail or forest road (red dashes). You'd need county roads. Check that county's ORV rules.`, at: r.gap.from });
+    else if (r.gap) w.push({ level: 'bad', text: `${a} → ${b} doesn't connect: ${fmtMi(r.gap.meters)} with no DNR trail or forest road (red dashes). You'd need county roads. ${window.countyRoadText ? countyRoadText((r.gap.from[0] + r.gap.to[0]) / 2, (r.gap.from[1] + r.gap.to[1]) / 2) || 'Check that county\'s ORV rules.' : 'Check that county\'s ORV rules.'}`, at: r.gap.from });
   });
 
   // closures and reroutes on or near the route
@@ -274,6 +274,12 @@ function tripWarnings(gas) {
     const age = Math.floor((Date.now() - new Date(built.replace(' ', 'T')).getTime()) / 86400000);
     if (age > 7) w.push({ level: 'warn', text: `Closure info is ${age} days old. Open the app with signal before you go.` });
   }
+  // trail reports (yours and your crew's) along the route
+  if (window.reportsAlongTrip) for (const rp of reportsAlongTrip().slice(0, 5)) {
+    const days = Math.floor((Date.now() - (rp.at || 0)) / 86400000);
+    w.push({ level: ['tree', 'washout', 'gate'].includes(rp.r) ? 'bad' : 'warn', at: [rp.lat, rp.lng],
+      text: `${rp.name || 'Trail report'} on the route, reported ${days < 1 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'} by ${rp.byName || 'a crew member'}${rp.note ? ': ' + rp.note : ''}.` });
+  }
   // hunting season (today's date: trips are usually ridden soon after planning)
   const hs = window.huntSeason && huntSeason();
   if (hs === 'firearm') w.push({ level: 'warn', text: 'Firearm deer season (Nov 15–30): no riding on public hunting land 7–11 a.m. and 2–5 p.m. That covers most of the trail system.' });
@@ -295,6 +301,7 @@ function showPlan() {
   let html = `<h3>${n < 2 ? 'Trip' : isTrip ? 'Trip' : 'Route'}${n >= 2 ? ': ' + fmtMi(t.m) : ''}</h3>`;
   if (n < 2) html += `<p class="hint">Add another stop: long-press the map, or tap a gas station, campground, waypoint, or trail and choose "Add to trip".</p>`;
   else html += `<p class="hint">About ${tripTime(t.m)} of riding at ${RIDE_MPH[0]}–${RIDE_MPH[1]} mph${rig ? ` · for your ${machineName()}` : ''}${window.sunsetText ? ` · sunset today ${sunsetText()}` : ''}</p>`;
+  if (n >= 2) html += '<div id="trip-mud"></div>';
   if (n >= 2) html += `<div class="rec-row"><button class="ghost" id="btn-plan-checkin">Tell someone your plan</button>${window.crewCode && crewCode() ? '<button class="ghost" id="btn-plan-crew">Share with my crew</button>' : ''}</div>`;
 
   const gasList = planLegs.length ? alongTrip('gas', GAS_NEAR_M) : [];
@@ -366,6 +373,7 @@ function showPlan() {
   html += `<div class="rec-row"><button class="ghost" id="btn-plan-gpx">Share GPX</button><button class="ghost" id="btn-plan-clear">Clear</button></div>`;
   $('#route-body').innerHTML = html;
   openSheet('#panel-route');
+  if (window.fillTripMud) fillTripMud();
   if (window.fillTripWeather && n >= 2) fillTripWeather();
 }
 
@@ -494,6 +502,8 @@ map.on('contextmenu', (e) => {
     if (s) sig.textContent = s === 'good' ? 'AT&T signal here: good (FCC map)' : s === 'weak' ? 'AT&T signal here: weak (FCC map)' : 'AT&T signal here: none (FCC map)';
   };
   showSignal();
+  const ct = window.countyRoadText ? countyRoadText(e.latlng.lat, e.latlng.lng) : '';
+  $('#point-county').hidden = !ct; $('#point-county').textContent = ct;
   if (window.loadCoverage && window.signalAt && signalAt(0, 0) === null) loadCoverage().then(showSignal);
   openSheet('#panel-point');
 });

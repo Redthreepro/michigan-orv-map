@@ -193,6 +193,7 @@ function showSOS() {
   openSheet('#sheet');
 }
 window.showSOS = showSOS;
+window.placeNear = (lat, lng) => { const t = placeText(lat, lng); return t ? `(${t})` : ''; };
 
 // ---------- tell someone your plan ----------
 function planSummary() {
