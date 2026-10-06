@@ -161,6 +161,7 @@ async function cloudClick(e) {
     if (a === 'crew-create') await createCrew();
     if (a === 'crew-join') await joinCrew();
     if (a === 'crew-send') await sendCrewCode();
+    if (a === 'board-mi' || a === 'board-new') { boardSort = a === 'board-new' ? 'new' : 'mi'; store.set('boardSort', boardSort); }
     if (a === 'trip-load') return loadCrewTrip(C.trips.find((t) => t.id === b.dataset.id));
     if (a === 'trip-del') { const t = C.trips.find((x) => x.id === b.dataset.id); if (t && confirm(`Remove "${t.name}" for the whole crew?`)) await fb.db.collection('crews').doc(C.code).collection('trips').doc(t.id).delete(); }
     if (a === 'crew-leave') { if (confirm('Leave this crew? Your rides stay on your phone.')) await leaveCrew(); }
@@ -354,7 +355,7 @@ function crewHtml() {
   const cs = crewSummary();
   h += `<p><b>${esc(d ? d.name : 'Loading…')}</b> · code <b class="crew-code">${esc(C.code)}</b></p>
     ${cs ? `<p class="hint">Together: ${fmtMi(cs.riddenM)} of ${fmtMi(cs.totalM)} ridden (${fmtPct(pct(cs.riddenM, cs.totalM))})</p>` : ''}
-    <ul class="along">${members.map(([uid, n]) => { const r = C.ridden.get(uid); return `<li><b>${esc(n)}${me && uid === me.uid ? ' (you)' : ''}</b><small>${r && r.mi != null ? fmtMi(r.mi * 1609.344) + ' ridden' : 'no rides shared yet'}</small></li>`; }).join('')}</ul>
+    ${leaderboardHtml(members)}
     <label class="row"><input type="checkbox" id="cl-crewmap" ${shown.crew ? 'checked' : ''}> Show the crew's ridden trails on the map</label>
     ${crewTripsHtml()}
     <div class="rec-row"><button class="ghost" data-a="crew-send">Send the code</button><button class="ghost danger" data-a="crew-leave">Leave crew</button></div>`;
@@ -435,7 +436,7 @@ function refreshCloudSheet() { if (!$('#sheet').hidden && document.getElementByI
 let upT = null;
 function uploadRidden() {
   clearTimeout(upT);
-  upT = setTimeout(() => {
+  upT = setTimeout(async () => {
     if (!C.code || !me || !fb || typeof progress === 'undefined' || !progress) return;
     const runs = {};
     let m = 0;
@@ -445,11 +446,20 @@ function uploadRidden() {
       runs[id] = flat(c.runs);
       m += c.riddenM;
     }
-    const key = JSON.stringify(runs);
+    // this season's totals for the crew leaderboard (totals only, never tracks)
+    let season = null;
+    try {
+      const year = new Date().getFullYear(), y0 = new Date(year, 0, 1).getTime();
+      const rides = await doneRides();
+      const mine = rides.filter((t) => t.start >= y0);
+      const newM = goalMilesCovered(rides) - goalMilesCovered(rides.filter((t) => t.start < y0));
+      season = { y: year, mi: +mine.reduce((s, t) => s + stats(t).mi, 0).toFixed(1), rides: mine.length, newMi: +(Math.max(0, newM) / 1609.344).toFixed(1) };
+    } catch {}
+    const key = JSON.stringify([runs, season, myName()]);
     if (key === C.upKey) return;
     C.upKey = key;
     fb.db.collection('crews').doc(C.code).collection('ridden').doc(me.uid)
-      .set({ name: myName(), runs, mi: +(m / 1609.344).toFixed(1), at: Date.now() }).catch(() => {});
+      .set({ name: myName(), runs, mi: +(m / 1609.344).toFixed(1), at: Date.now(), ...(season ? { season } : {}) }).catch(() => {});
   }, 4000);
 }
 window.cloudProgress = () => uploadRidden();
@@ -512,6 +522,26 @@ window.drawCrewLayer = drawCrew;
 if (shown.crew === undefined) shown.crew = 1;
 const crewBox = document.querySelector('[data-kind="crew"]');
 if (crewBox) { crewBox.checked = !!shown.crew; crewBox.addEventListener('change', drawCrew); }
+
+// ---------- crew leaderboard ----------
+let boardSort = store.get('boardSort', 'mi');
+function leaderboardHtml(members) {
+  const year = new Date().getFullYear();
+  const rows = members.map(([uid, n]) => {
+    const r = C.ridden.get(uid) || {};
+    const s = r.season && r.season.y === year ? r.season : { mi: 0, rides: 0, newMi: 0 };
+    return { uid, name: n, mi: s.mi || 0, newMi: s.newMi || 0, rides: s.rides || 0, all: r.mi, shared: !!r.at };
+  }).sort((a, b) => (boardSort === 'new' ? b.newMi - a.newMi || b.mi - a.mi : b.mi - a.mi || b.newMi - a.newMi));
+  const medal = ['🥇', '🥈', '🥉'];
+  return `<h2>${year} leaderboard</h2>
+    <div class="seg board-sort"><button data-a="board-mi" class="${boardSort === 'mi' ? 'on' : ''}">Miles ridden</button><button data-a="board-new" class="${boardSort === 'new' ? 'on' : ''}">New trail</button></div>
+    <ol class="board">${rows.map((r, i) => `<li class="${me && r.uid === me.uid ? 'is-me' : ''}">
+      <span class="rank">${(boardSort === 'new' ? r.newMi : r.mi) > 0 && i < 3 ? medal[i] : i + 1}</span>
+      <div class="who"><b>${esc(r.name)}${me && r.uid === me.uid ? ' (you)' : ''}</b>
+        <small>${r.shared ? `${r.rides} ride${r.rides === 1 ? '' : 's'} this season${r.all != null ? ` · ${r.all.toFixed(0)} mi of Michigan trail all time` : ''}` : 'no rides shared yet'}</small></div>
+      <div class="nums"><b>${(boardSort === 'new' ? r.newMi : r.mi).toFixed(0)}</b><small>${boardSort === 'new' ? 'new trail mi' : 'miles'}</small></div></li>`).join('')}</ol>
+    <p class="hint">"New trail" is trail miles a rider covered for the first time ever this season.</p>`;
+}
 
 // ---------- planned rides shared with the crew ----------
 function crewTripsHtml() {

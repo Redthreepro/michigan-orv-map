@@ -278,6 +278,16 @@ a { color: #6fa8ff; }
 .milestones li small { color: var(--muted); }
 .milestone-new { background: #00e67618; border: 1px solid var(--ridden, #00e676); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
 .milestone-new b { display: block; color: var(--ridden, #00e676); }
+.board { list-style: none; padding: 0; margin: 8px 0; }
+.board li { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+.board li.is-me { background: #ffffff0d; border-radius: 10px; }
+.board .rank { width: 30px; text-align: center; font-weight: 800; font-size: 18px; }
+.board .who { flex: 1; min-width: 0; }
+.board .who b, .board .who small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .who small, .board .nums small { color: var(--muted); font-size: 12px; }
+.board .nums { text-align: right; }
+.board .nums b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.board-sort { margin-top: 4px; }
 .cloud-btn { color: #7fd8ff; border-color: #7fd8ff66; }
 .link-btn { background: none; border: 0; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
 .crew-code { font-size: 20px; letter-spacing: .12em; }
