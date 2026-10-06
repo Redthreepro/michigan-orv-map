@@ -263,6 +263,21 @@ a { color: #6fa8ff; }
 .mud { display: flex; flex-direction: column; gap: 2px; border-radius: 10px; padding: 10px 12px; margin: 8px 0; background: var(--bg); border-left: 4px solid #2fbf4a; }
 .mud span { font-size: 14px; }
 .mud-1 { border-left-color: #9ccc65; } .mud-2 { border-left-color: #ffd400; } .mud-3 { border-left-color: #ff8c00; background: #ff8c0018; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.stat-grid > div { background: var(--bg); border-radius: 12px; padding: 10px 6px; text-align: center; }
+.stat-grid b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+.stat-grid small { color: var(--muted); font-size: 12px; }
+.month-bars { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; align-items: end; height: 90px; }
+.month-bars > div { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.month-bars span { width: 100%; background: var(--ridden, #00e676); border-radius: 4px 4px 0 0; min-height: 2px; }
+.month-bars small { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.county-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.county-chips span { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 3px 10px; font-size: 13px; }
+.county-chips span.done { border-color: var(--ridden, #00e676); color: var(--ridden, #00e676); }
+.milestones li.got b { color: var(--ridden, #00e676); }
+.milestones li small { color: var(--muted); }
+.milestone-new { background: #00e67618; border: 1px solid var(--ridden, #00e676); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
+.milestone-new b { display: block; color: var(--ridden, #00e676); }
 .cloud-btn { color: #7fd8ff; border-color: #7fd8ff66; }
 .link-btn { background: none; border: 0; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
 .crew-code { font-size: 20px; letter-spacing: .12em; }

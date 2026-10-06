@@ -129,6 +129,7 @@ function showRideDetails(t) {
     }).join('') + '</ul>';
   }
   if (window.ridePhotosHtml) html += ridePhotosHtml(t);
+  html += `<button class="primary alt" data-a="card">Share ride card</button>`;
   html += `<div class="rec-row"><button class="ghost" data-a="show">Show on map</button><button class="ghost" data-a="edit">Edit</button><button class="ghost" data-a="gpx">GPX</button></div>`;
   const body = $('#ride-detail-body');
   body.innerHTML = html;
@@ -138,6 +139,7 @@ function showRideDetails(t) {
     if (a === 'show') { showTrack(t); closeSheets(); }
     if (a === 'edit') editRide(t);
     if (a === 'gpx') exportGpx(t);
+    if (a === 'card' && window.shareRideCard) shareRideCard(t);
   };
   openSheet('#panel-ride-detail');
 }

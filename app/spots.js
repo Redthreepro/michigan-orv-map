@@ -144,12 +144,15 @@ $('#photo-bar').addEventListener('click', async (e) => {
 });
 window.offerEndPhoto = (ride, mi) => {
   $('#sheet-body').innerHTML = `<h3>Ride saved</h3><p>${esc(ride.name)} · ${mi.toFixed(1)} mi</p>
-    <button class="primary" data-a="photo">${GLYPH.photo} Take an end photo</button>
+    <div id="ride-milestones"></div>
+    <div class="rec-row"><button class="primary" data-a="photo">${GLYPH.photo} End photo</button><button class="primary alt" data-a="card">Share ride card</button></div>
     <div class="rec-row"><button class="ghost" data-a="details">Ride details</button><button class="ghost" data-a="done">Done</button></div>`;
+  if (window.newMilestonesHtml) newMilestonesHtml(ride).then((h) => { const el = document.getElementById('ride-milestones'); if (el) el.innerHTML = h; }).catch(() => {});
   $('#sheet-body').onclick = async (e) => {
     const a = e.target.closest('button')?.dataset.a;
     if (a === 'done') closeSheets();
     if (a === 'details' && window.showRideDetails) showRideDetails(ride);
+    if (a === 'card' && window.shareRideCard) shareRideCard(ride);
     if (a === 'photo') {
       const id = await takePhoto();
       if (!id) return;
