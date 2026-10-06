@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=48">
+<link rel="stylesheet" href="style.css?v=49">
 </head>
 <body>
 <div id="map"></div>
@@ -77,7 +77,7 @@
   <div class="d-speed"><b id="dash-speed">–</b><small>mph</small></div>
   <div><b id="dash-mi">0.0</b><small>miles</small></div>
   <div><b id="dash-time">0:00</b><small>moving</small></div>
-  <div><b id="dash-truck">–</b><small id="dash-truck-dir">to truck</small></div>
+  <div id="dash-truck-cell" role="button" aria-label="Route back to the truck"><b id="dash-truck">–</b><small id="dash-truck-dir">to truck</small></div>
 </div>
 <div id="ride-actions" hidden>
   <button data-a="pause" class="ra-pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Pause</span></button>
@@ -98,7 +98,7 @@
   <div class="rec-row"><button id="btn-sos" class="ghost sos">SOS / emergency</button><button id="btn-laws" class="ghost">Rules &amp; permits</button></div>
   <button id="btn-cloud" class="ghost cloud-btn">Crew &amp; Ride Watch (live link for family)</button>
   <button id="btn-updates" class="ghost">DNR trail updates (last 60 days)</button>
-  <button id="btn-plans" class="ghost">My saved ride plans</button>
+  <div class="rec-row"><button id="btn-loop" class="ghost">Find me a loop</button><button id="btn-plans" class="ghost">My saved ride plans</button></div>
   <h2>My machine</h2>
   <div class="seg machines" id="rig-seg">
     <button data-rig="24">Dirt bike</button>
@@ -214,6 +214,7 @@
   <div class="rec-row"><button id="btn-route-here" class="primary">Route here</button><button id="btn-add-trip" class="ghost">Add to trip</button></div>
   <div class="rec-row"><button id="btn-route-from" class="ghost">Start trip here</button><button id="btn-save-wp" class="ghost">Save as waypoint</button></div>
   <div class="rec-row"><button id="btn-drive" class="ghost">Drive here (Google Maps)</button><button id="btn-send-dir" class="ghost">Send directions</button></div>
+  <div class="rec-row"><button id="btn-loop-here" class="ghost">Find a loop from here</button><button id="btn-truck-here" class="ghost">Truck is parked here</button></div>
 </section>
 
 <!-- route -->
@@ -328,25 +329,26 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=48"></script>
-<script src="tracks.js?v=48"></script>
-<script src="routing.js?v=48"></script>
-<script src="places.js?v=48"></script>
-<script src="plan.js?v=48"></script>
-<script src="nav.js?v=48"></script>
-<script src="offline.js?v=48"></script>
-<script src="gpx.js?v=48"></script>
-<script src="weather.js?v=48"></script>
-<script src="progress.js?v=48"></script>
-<script src="details.js?v=48"></script>
-<script src="edit.js?v=48"></script>
-<script src="select.js?v=48"></script>
-<script src="updates.js?v=48"></script>
-<script src="laws.js?v=48"></script>
-<script src="safety.js?v=48"></script>
-<script src="merge.js?v=48"></script>
-<script src="spots.js?v=48"></script>
-<script src="cloud.js?v=48"></script>
-<script src="colors.js?v=48"></script>
+<script src="app.js?v=49"></script>
+<script src="tracks.js?v=49"></script>
+<script src="routing.js?v=49"></script>
+<script src="places.js?v=49"></script>
+<script src="plan.js?v=49"></script>
+<script src="nav.js?v=49"></script>
+<script src="offline.js?v=49"></script>
+<script src="gpx.js?v=49"></script>
+<script src="weather.js?v=49"></script>
+<script src="progress.js?v=49"></script>
+<script src="details.js?v=49"></script>
+<script src="edit.js?v=49"></script>
+<script src="select.js?v=49"></script>
+<script src="updates.js?v=49"></script>
+<script src="laws.js?v=49"></script>
+<script src="safety.js?v=49"></script>
+<script src="merge.js?v=49"></script>
+<script src="spots.js?v=49"></script>
+<script src="cloud.js?v=49"></script>
+<script src="colors.js?v=49"></script>
+<script src="loops.js?v=49"></script>
 </body>
 </html>

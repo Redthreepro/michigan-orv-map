@@ -53,7 +53,7 @@ function sunCheck() {
 // straight-line distance back to where this ride started, and a rough time for it on the trails
 function truckBack() {
   if (!(window.isRecording && isRecording())) return null;
-  const start = window.rideStartPoint && rideStartPoint();
+  const start = window.truckPoint ? truckPoint() : window.rideStartPoint && rideStartPoint();
   const here = meMarker && meMarker.getLatLng();
   if (!start || !here) return null;
   const mi = hav(start[0], start[1], here.lat, here.lng) / 1609.344;
@@ -175,6 +175,7 @@ function showSOS() {
   if (window.watchShared && watchShared()) html += window.cloudSOSActive && cloudSOSActive()
     ? '<button class="primary alt" data-a="family-ok">I\'m OK now: cancel the family alert</button>'
     : '<button class="primary sos-family" data-a="family">Alert my family (Ride Watch link)</button>';
+  html += '<button class="ghost" data-a="truck">Route back to the truck</button>';
   html += `<h2>Before you lose signal</h2><button class="ghost" data-a="checkin">Tell someone your plan</button>`;
   $('#sheet-body').innerHTML = html;
   $('#sheet-body').onclick = async (e) => {
@@ -185,6 +186,7 @@ function showSOS() {
     }
     if (a === 'hosp-go') driveTo(hosp.p.lat, hosp.p.lng);
     if (a === 'checkin') showCheckin();
+    if (a === 'truck' && window.backToTruck) backToTruck();
     if (a === 'family') { const ok = window.cloudSOS && await cloudSOS(at.lat, at.lng); toast(ok ? 'Alert sent to your family link. With no signal it sends as soon as you get one.' : 'Sign in under Crew & Ride Watch first.'); if (ok) showSOS(); }
     if (a === 'family-ok') { await cloudSOSClear(); toast('Alert cancelled. Your family link shows you\'re OK.'); showSOS(); }
   };

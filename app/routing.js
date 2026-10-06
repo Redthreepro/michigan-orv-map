@@ -77,8 +77,12 @@ function allowed(e) {
   if (dates && !openToday(dates)) return false; // national forest roads outside their open dates
   return true;
 }
+// LOOP_COST (loops.js) can make some edges cost more: already-ridden trail, or one this loop already uses.
+// It only ever multiplies by 1 or more, so the A* distance estimate stays valid.
+let LOOP_COST = null;
 function cost(e, meters) {
-  return meters / (SPEED[G.attrs[G.eattr[e]][0]] || 5);
+  const c = meters / (SPEED[G.attrs[G.eattr[e]][0]] || 5);
+  return LOOP_COST ? c * LOOP_COST(e) : c;
 }
 
 // ---------- snapping ----------

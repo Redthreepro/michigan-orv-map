@@ -177,6 +177,7 @@ function refreshRecUi() {
   if (rec) tickT = setInterval(tickRec, 1000);
 }
 const DIRS8 = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+$('#dash-truck-cell').addEventListener('click', () => { if (window.backToTruck && confirm('Route back to the truck?')) backToTruck(); });
 function drawDash(s) {
   const dash = $('#ride-dash');
   dash.hidden = !rec;
@@ -186,7 +187,7 @@ function drawDash(s) {
   $('#dash-mi').textContent = s.mi < 100 ? s.mi.toFixed(1) : s.mi.toFixed(0);
   const mm = Math.floor((rec.moveMs || 0) / 60000);
   $('#dash-time').textContent = mm < 60 ? `${mm}m` : `${Math.floor(mm / 60)}h ${mm % 60}m`;
-  const start = window.rideStartPoint && rideStartPoint(), here = meMarker && meMarker.getLatLng();
+  const start = window.truckPoint ? truckPoint() : rideStartPoint(), here = meMarker && meMarker.getLatLng();
   if (start && here) {
     const mi = meters(start, [here.lat, here.lng]) / 1609.344;
     const y = Math.sin((start[1] - here.lng) * Math.PI / 180) * Math.cos(start[0] * Math.PI / 180);
