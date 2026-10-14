@@ -1,5 +1,5 @@
 // Bump SHELL when app files change so phones pick up the new version.
-const SHELL = 'orv-shell-v55';
+const SHELL = 'orv-shell-v63';
 const DATA = 'orv-data';
 const TILES = 'orv-tiles';
 const SHELL_FILES = [
@@ -14,7 +14,7 @@ self.addEventListener('install', (e) => {
     // bypass the browser's HTTP cache so a new version never installs yesterday's files
     await (await caches.open(SHELL)).addAll(SHELL_FILES.map(fresh));
     await (await caches.open(DATA)).addAll(DATA_FILES.map(fresh));
-    self.skipWaiting();
+    // Keep the active version intact until the rider chooses to reload.
   })());
 });
 
@@ -29,6 +29,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('message', (e) => {
   const reply = (m) => e.ports[0] && e.ports[0].postMessage(m);
   const t = e.data && e.data.type;
+  if (t === 'activate-update') { self.skipWaiting(); return; }
   if (t === 'status') {
     e.waitUntil((async () => {
       const missing = [];
@@ -41,7 +42,11 @@ self.addEventListener('message', (e) => {
   if (t === 'repair') {
     e.waitUntil((async () => {
       try {
-        await (await caches.open(SHELL)).addAll(SHELL_FILES.map(fresh));
+        // Never overwrite installed code with files from a newer deployment.
+        const shell = await caches.open(SHELL);
+        for (const f of SHELL_FILES) if (!(await shell.match(f, { ignoreSearch: true }))) {
+          reply({ ok: false }); return;
+        }
         await (await caches.open(DATA)).addAll(DATA_FILES.map(fresh));
         reply({ ok: true });
       } catch { reply({ ok: false }); }
@@ -91,12 +96,16 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // App shell: serve the saved copy instantly, refresh it in the background for next launch.
+  // App shell is immutable within a version. New code installs in a new cache.
   e.respondWith((async () => {
     const cache = await caches.open(SHELL);
     const hit = await cache.match(req, { ignoreSearch: true });
-    const refresh = fetch(req, { cache: 'no-cache' }).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
-    if (hit) { e.waitUntil(refresh); return hit; }
-    return (await refresh) || new Response('Offline', { status: 504 });
+    if (hit) return hit;
+    // A missing installed script must not be replaced by another release's code.
+    if (SHELL_FILES.some((file) => new URL(file, self.location.href).pathname === url.pathname)) {
+      return new Response('Installed app files are missing. Reconnect and install the current app version.', { status: 503 });
+    }
+    try { return await fetch(req, { cache: 'no-cache' }); }
+    catch { return new Response('Offline', { status: 504 }); }
   })());
 });

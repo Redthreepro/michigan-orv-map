@@ -113,19 +113,21 @@ $('#import-body').addEventListener('click', async (e) => {
 
 // ---------- backup / restore ----------
 async function backupAll() {
-  const rides = (await allTracks().catch(() => [])).filter((t) => t.done);
-  const wps = (await tx('readonly', (s) => s.getAll(), 'waypoints').catch(() => [])) || [];
-  const photos = window.photosForBackup ? await photosForBackup() : [];
-  const data = { app: 'michigan-orv-map', version: 1, made: new Date().toISOString(), rides, waypoints: wps, trip: plan,
-    settings: { rig, base: baseKey, shown }, photos, plans: store.get('plans', []) };
-  const d = new Date();
-  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const ok = await shareFile(`orv-map-backup-${day}.json`, JSON.stringify(data), 'application/json');
-  if (ok) {
-    try { localStorage.setItem('orv.lastBackup', String(Date.now())); } catch {}
-    toast(`Backed up ${rides.length} ride${rides.length === 1 ? '' : 's'}, ${wps.length} waypoint${wps.length === 1 ? '' : 's'} and ${photos.length} photo${photos.length === 1 ? '' : 's'}`);
-    if (window.refreshOffline) refreshOffline();
-  }
+  try {
+    const rides = (await allTracks()).filter((t) => t.done);
+    const wps = (await tx('readonly', (s) => s.getAll(), 'waypoints')) || [];
+    const photos = window.photosForBackup ? await photosForBackup() : [];
+    const data = { app: 'michigan-orv-map', version: 1, made: new Date().toISOString(), rides, waypoints: wps, trip: plan,
+      settings: { rig, base: baseKey, shown }, photos, plans: store.get('plans', []) };
+    const d = new Date();
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const ok = await shareFile(`orv-map-backup-${day}.json`, JSON.stringify(data), 'application/json');
+    if (ok) {
+      try { localStorage.setItem('orv.lastBackup', String(Date.now())); } catch {}
+      toast(`Backed up ${rides.length} ride${rides.length === 1 ? '' : 's'}, ${wps.length} waypoint${wps.length === 1 ? '' : 's'} and ${photos.length} photo${photos.length === 1 ? '' : 's'}`);
+      if (window.refreshOffline) refreshOffline();
+    }
+  } catch { toast('Backup failed. Could not read or export all your data; no complete backup was confirmed.'); }
 }
 window.backupAll = backupAll;
 

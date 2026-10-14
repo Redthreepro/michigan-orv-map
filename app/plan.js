@@ -47,7 +47,7 @@ async function computePlan({ fit = true, show = true } = {}) {
   if (!plan || !plan.stops.length) return;
   const first = plan.stops[0];
   if (first.mine) {
-    let here = meMarker ? meMarker.getLatLng() : null;
+    let here = currentGpsFix();
     if (!here) {
       ensureGpsFix();
       toast('Getting your GPS location…');
@@ -570,7 +570,8 @@ function waitForFix(ms) {
   return new Promise((resolve) => {
     const t0 = Date.now();
     const iv = setInterval(() => {
-      if (meMarker) { clearInterval(iv); resolve(meMarker.getLatLng()); }
+      const fix = currentGpsFix();
+      if (fix) { clearInterval(iv); resolve(L.latLng(fix.lat, fix.lng)); }
       else if (Date.now() - t0 > ms) { clearInterval(iv); resolve(null); }
     }, 300);
   });

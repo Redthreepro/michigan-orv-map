@@ -107,6 +107,7 @@ dt { color: var(--muted); } dd { margin: 0; }
 .chip { pointer-events: auto; border: 0; background: #000c; color: #fff; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 18px;
   display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }
 .chip[hidden] { display: none; }
+#screen-warning { background: #8b1a1a; white-space: normal; max-width: calc(100vw - 24px); width: 380px; text-align: center; }
 #route-bar { background: #1e6bffe6; }
 #hunt-bar { background: #ff8c00f0; color: #111; }
 #hunt-bar.alert { background: #c62828f0; color: #fff; }
@@ -424,8 +425,13 @@ body.progress-colors .sw.route, body.progress-colors .sw.trail, body.progress-co
 .trace-main small { color: #e9b8e0; }
 .trace-btns { display: flex; gap: 8px; margin-top: 8px; }
 .trace-btns button { flex: 1; height: 40px; margin: 0; }
+.trace-method { display: flex; gap: 8px; margin-top: 8px; }
+.trace-method[hidden] { display: none; }
+.trace-method button { flex: 1; min-height: 40px; border: 1px solid #e9b8e0; border-radius: 8px; background: transparent; color: #fff; }
+.trace-method button[aria-pressed="true"] { background: #ff2fd0; color: #111; font-weight: 700; }
 .primary.small { height: 40px; margin: 0; }
 body.tracing #topbar, body.tracing #chips { display: none !important; }
+body.tracing #update-bar { display: none; }
 /* draggable dots: a 34px touch target around a smaller visible dot */
 .trace-dot { background: none; border: 0; }
 .trace-dot::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: #ff2fd0; border: 3px solid #fff; box-shadow: 0 1px 4px #0008; }
@@ -461,3 +467,9 @@ body.tracing #topbar, body.tracing #chips { display: none !important; }
 .ride-chart .ch-hit { fill: transparent; cursor: crosshair; }
 .ch-tip { position: absolute; top: -4px; background: #000d; color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 6px; pointer-events: none; white-space: nowrap; }
 .hint.center { text-align: center; }
+
+/* Emergency access stays visible on the map, including while navigating. */
+.fab.sos-fab { background: #b71c1c; color: #fff; font-size: 14px; font-weight: 800; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #ffd400; outline-offset: 3px; }
+/* Update prompts must not cover emergency actions or other sheet controls. */
+.sheet:not([hidden]) ~ #update-bar { display: none; }

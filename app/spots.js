@@ -222,8 +222,8 @@ $('#btn-wp-photo').addEventListener('click', async () => {
 
 // ---------- backup: photos ride along as data URLs ----------
 window.photosForBackup = async () => {
-  const all = (await tx('readonly', (s) => s.getAll(), 'photos').catch(() => [])) || [];
-  const toUrl = (b) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
+  const all = (await tx('readonly', (s) => s.getAll(), 'photos')) || [];
+  const toUrl = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.onabort = () => rej(new Error('Photo read aborted')); r.readAsDataURL(b); });
   const out = [];
   for (const p of all) out.push({ id: p.id, at: p.at, blob: await toUrl(p.blob), thumb: await toUrl(p.thumb) });
   return out;

@@ -154,44 +154,95 @@ function placeText(lat, lng) {
   const t = nearestTown(lat, lng);
   return t ? (t.mi < 1 ? `in ${t.name}` : `${t.mi.toFixed(0)} mi ${t.dir} of ${t.name}`) : '';
 }
-function showSOS() {
-  const gps = !!meMarker;
-  if (!gps) ensureGpsFix && ensureGpsFix();
-  const at = whereNow();
+let sosManual = null, sosRenderedKey = '';
+function emergencyLocation() { return sosManual || currentGpsFix(); }
+function sosViewKey() { return JSON.stringify([emergencyLocation(), window.cloudSOSStatus && cloudSOSStatus(), window.cloudSOSActive && cloudSOSActive()]); }
+function emergencyMessage(at) {
+  if (!at) return "Emergency. I need help. My current location is unavailable. Please contact me for landmarks.";
   const ll = `${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}`;
   const near = placeText(at.lat, at.lng);
-  const mapUrl = `https://www.google.com/maps/search/?api=1&query=${at.lat.toFixed(5)},${at.lng.toFixed(5)}`;
-  const msg = `Emergency. I'm at ${ll}${near ? ` (${near})` : ''}. ${mapUrl}`;
-  const hosp = nearestHospital(at.lat, at.lng);
-  let html = `<h3>Emergency</h3>
-    <div class="sos-loc"><b>${ll}</b><small>${near ? esc(near[0].toUpperCase() + near.slice(1)) : ''}${gps ? '' : `${near ? '. ' : ''}No GPS fix yet, so this is the middle of the map.`}</small></div>
-    <button class="primary" data-a="share">Share my location</button>
-    <div class="rec-row"><a class="btn danger" href="tel:911">Call 911</a><a class="btn danger" href="sms:911?&body=${encodeURIComponent(msg)}">Text 911</a></div>
-    <p class="hint">No signal for a call? A text can still get through. Read the numbers above to the dispatcher.</p>`;
-  if (hosp) {
-    html += `<h2>Nearest hospital</h2><div class="sos-hosp"><b>${esc(hosp.p.n)}</b><small>${hosp.mi.toFixed(0)} mi away${hosp.p.city ? ` · ${esc(hosp.p.city)}` : ''}${hosp.p.er ? ' · emergency room' : ''}</small></div>
-      <div class="rec-row"><button class="ghost" data-a="hosp-go">Directions</button>${hosp.p.ph ? `<a class="btn ghost" href="tel:${esc(hosp.p.ph.replace(/[^\d+]/g, ''))}">Call</a>` : ''}</div>`;
+  const description = at.source === 'manual' ? 'Manually selected location (not GPS)' : `GPS location (accuracy ±${Math.round(at.accuracy)} m; fix ${new Date(at.t).toLocaleTimeString()})`;
+  return `Emergency. I need help. ${description}: ${ll}${near ? ` (${near})` : ''}. https://www.google.com/maps/search/?api=1&query=${at.lat.toFixed(5)},${at.lng.toFixed(5)}`;
+}
+function alertStatusText() {
+  const state = window.cloudSOSStatus ? cloudSOSStatus() : null;
+  if (state === 'confirmed') return 'Emergency alert saved to your family link. This does not confirm anyone has seen it.';
+  if (state === 'cleared') return 'Cancellation saved to your family link. This does not confirm anyone has seen it.';
+  if (state === 'pending') return 'Emergency alert pending. Server confirmation has not arrived; delivery is not confirmed. Keep the app open and reconnect.';
+  if (state === 'pending-clear') return 'Cancellation pending. Your family link may still show the emergency alert.';
+  if (state === 'failed') return 'Emergency alert failed. Try again or call/text for help.';
+  if (state === 'clear-failed') return 'Cancellation failed. Your family link may still show the emergency alert.';
+  return '';
+}
+function renderSOS() {
+  sosRenderedKey = sosViewKey();
+  const at = emergencyLocation();
+  const manual = at && at.source === 'manual';
+  const near = at ? placeText(at.lat, at.lng) : '';
+  const hosp = at ? nearestHospital(at.lat, at.lng) : null;
+  const status = alertStatusText();
+  const pending = window.cloudSOSStatus && ['pending', 'pending-clear'].includes(cloudSOSStatus());
+  let html = `<h3 id="sos-view">Emergency</h3>
+    <div class="sos-loc" role="status"><b>${at ? `${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}` : 'Current location unavailable'}</b>
+    <small>${at ? `${manual ? 'Manually selected location — not GPS' : `GPS fix · accuracy ±${Math.round(at.accuracy)} m · ${esc(clock(new Date(at.t)))}`}${near ? ` · ${esc(near)}` : ''}` : 'No recent GPS fix. Map-center coordinates are not your confirmed location.'}</small></div>
+    <button class="primary" data-a="share">${at ? manual ? 'Share selected location' : 'Share GPS location' : 'Share emergency message without location'}</button>
+    <div class="rec-row"><a class="btn danger" href="tel:911">Call 911</a><a class="btn danger" data-a="text" href="sms:911?&body=${encodeURIComponent(emergencyMessage(at))}">Text 911</a></div>
+    <p class="hint">Call if you can. Text-to-911 availability varies and texts need cellular service. Opening a message or share sheet does not confirm delivery. If location is unavailable, describe landmarks to the dispatcher.</p>
+    <button class="ghost" data-a="gps">${manual ? 'Use GPS instead' : 'Retry GPS'}</button>
+    <button class="ghost" data-a="manual">Use map center as a manually selected location…</button>`;
+  if (hosp) html += `<h2>Hospital near ${manual ? 'selected location' : 'GPS fix'}</h2><div class="sos-hosp"><b>${esc(hosp.p.n)}</b><small>${hosp.mi.toFixed(0)} mi in a straight line${hosp.p.city ? ` · ${esc(hosp.p.city)}` : ''}${hosp.p.er ? ' · emergency room' : ''}</small></div>
+    <div class="rec-row"><button class="ghost" data-a="hosp-go">Directions</button>${hosp.p.ph ? `<a class="btn ghost" href="tel:${esc(hosp.p.ph.replace(/[^\d+]/g, ''))}">Call</a>` : ''}</div>`;
+  if (window.watchShared && watchShared()) {
+    if (status) html += `<p class="hint" role="status">${esc(status)}</p>`;
+    html += window.cloudSOSActive && cloudSOSActive()
+      ? `<button class="primary alt" data-a="family-ok" ${window.cloudSOSStatus && cloudSOSStatus() === 'pending-clear' ? 'disabled' : ''}>I'm OK now: cancel the family alert</button>`
+      : `<button class="primary sos-family" data-a="family" ${pending ? 'disabled' : ''}>${at ? 'Alert my family (Ride Watch link)' : 'Alert my family without location'}</button>`;
+    if (window.cloudSOSStatus && cloudSOSStatus() === 'failed') html += '<button class="ghost" data-a="family">Retry family alert</button>';
   }
-  if (window.watchShared && watchShared()) html += window.cloudSOSActive && cloudSOSActive()
-    ? '<button class="primary alt" data-a="family-ok">I\'m OK now: cancel the family alert</button>'
-    : '<button class="primary sos-family" data-a="family">Alert my family (Ride Watch link)</button>';
-  html += '<button class="ghost" data-a="truck">Route back to the truck</button>';
-  html += `<h2>Before you lose signal</h2><button class="ghost" data-a="checkin">Tell someone your plan</button>`;
+  html += '<button class="ghost" data-a="truck">Route back to the truck</button><h2>Before you lose signal</h2><button class="ghost" data-a="checkin">Tell someone your plan</button>';
   $('#sheet-body').innerHTML = html;
   $('#sheet-body').onclick = async (e) => {
-    const a = e.target.closest('button')?.dataset.a;
-    if (a === 'share') {
-      if (navigator.share) { try { await navigator.share({ title: 'My location', text: msg }); return; } catch (err) { if (err.name === 'AbortError') return; } }
-      try { await navigator.clipboard.writeText(msg); toast('Location copied. Paste it in a text.'); } catch { prompt('Copy your location:', msg); }
+    const el = e.target.closest('[data-a]');
+    if (!el || el.disabled) return;
+    const a = el.dataset.a;
+    // Recheck freshness at the moment of sharing, including the SMS link.
+    const selected = emergencyLocation();
+    const msg = emergencyMessage(selected);
+    if (a === 'text') { el.href = `sms:911?&body=${encodeURIComponent(msg)}`; return; }
+    if (a === 'gps') { sosManual = null; ensureGpsFix(); renderSOS(); }
+    if (a === 'manual') {
+      const p = map.getCenter();
+      if (validLocation(p) && confirm(`Share ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)} as a manually selected location? This is the map center, not a GPS fix. Only choose it if you know it is relevant to your emergency.`)) {
+        sosManual = { lat: p.lat, lng: p.lng, t: Date.now(), source: 'manual' }; renderSOS();
+      }
     }
-    if (a === 'hosp-go') driveTo(hosp.p.lat, hosp.p.lng);
+    if (a === 'share') {
+      if (navigator.share) { try { await navigator.share({ title: 'Emergency', text: msg }); return; } catch (err) { if (err.name === 'AbortError') return; } }
+      try { await navigator.clipboard.writeText(msg); toast('Emergency message copied. Paste and send it in a text.'); } catch { prompt('Copy emergency message:', msg); }
+    }
+    if (a === 'hosp-go' && hosp) driveTo(hosp.p.lat, hosp.p.lng);
     if (a === 'checkin') showCheckin();
     if (a === 'truck' && window.backToTruck) backToTruck();
-    if (a === 'family') { const ok = window.cloudSOS && await cloudSOS(at.lat, at.lng); toast(ok ? 'Alert sent to your family link. With no signal it sends as soon as you get one.' : 'Sign in under Crew & Ride Watch first.'); if (ok) showSOS(); }
-    if (a === 'family-ok') { await cloudSOSClear(); toast('Alert cancelled. Your family link shows you\'re OK.'); showSOS(); }
+    if (a === 'family' || a === 'family-ok') {
+      el.disabled = true;
+      try {
+        const result = a === 'family' ? await cloudSOS(selected) : await cloudSOSClear();
+        toast(result ? alertStatusText() : 'Sign in under Crew & Ride Watch first.');
+      } catch { toast('Could not queue the family update. Delivery is not confirmed. Try calling or texting for help.'); }
+      if (document.getElementById('sos-view')) renderSOS();
+    }
   };
+}
+function showSOS() {
+  sosManual = null;
+  if (!currentGpsFix()) ensureGpsFix();
+  renderSOS();
   openSheet('#sheet');
 }
+function refreshSOS() { if (!$('#sheet').hidden && document.getElementById('sos-view') && sosRenderedKey !== sosViewKey()) renderSOS(); }
+window.addEventListener('gpschange', refreshSOS);
+window.addEventListener('soschange', refreshSOS);
+setInterval(refreshSOS, 1000); // expire a fix even if GPS stops producing callbacks
 window.showSOS = showSOS;
 window.placeNear = (lat, lng) => { const t = placeText(lat, lng); return t ? `(${t})` : ''; };
 
@@ -205,13 +256,11 @@ function planSummary() {
   return '';
 }
 function showCheckin() {
-  const at = whereNow();
-  const near = placeText(at.lat, at.lng);
   const def = new Date(Date.now() + 4 * 3600000);
   def.setMinutes(Math.ceil(def.getMinutes() / 15) * 15, 0, 0);
   const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   $('#sheet-body').innerHTML = `<h3>Tell someone your plan</h3>
-    <p class="hint">Sends a text with where you're riding and when you'll be back, so someone knows when to worry.</p>
+    <p class="hint">Prepare a message with your route and return time. Send it to someone you trust and make sure they receive it.</p>
     <label class="row field-row">Back by <input id="ci-time" class="field" type="time" value="${hhmm(def)}"></label>
     <label class="row field-row">Call for help after <select id="ci-grace" class="field"><option value="60">1 hour late</option><option value="120" selected>2 hours late</option><option value="240">4 hours late</option></select></label>
     <textarea id="ci-note" class="field" rows="2" placeholder="Who's riding, what machines (optional)"></textarea>
@@ -223,10 +272,14 @@ function showCheckin() {
     if (back < Date.now()) back.setDate(back.getDate() + 1); // a time earlier than now means tomorrow
     const worry = new Date(back.getTime() + +$('#ci-grace').value * 60000);
     const when = (d) => `${clock(d)}${d.toDateString() === new Date().toDateString() ? '' : ' ' + d.toLocaleDateString(undefined, { weekday: 'short' })}`;
+    const at = currentGpsFix();
+    const near = at ? placeText(at.lat, at.lng) : '';
     const what = planSummary();
     const note = $('#ci-note').value.trim();
-    const text = `ORV ride plan: ${what ? what + '. ' : ''}Starting near ${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}${near ? ` (${near})` : ''}.${note ? ' ' + note + '.' : ''}
-Back by ${when(back)}. If you haven't heard from me by ${when(worry)}, call 911 and give them this location: https://www.google.com/maps/search/?api=1&query=${at.lat.toFixed(5)},${at.lng.toFixed(5)}`;
+    const location = at ? `Starting GPS fix: ${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}${near ? ` (${near})` : ''} (accuracy ±${Math.round(at.accuracy)} m).`
+      : 'Starting location unavailable; ask me for my starting point and landmarks.';
+    const text = `ORV ride plan: ${what ? what + '. ' : ''}${location}${note ? ' ' + note + '.' : ''}
+Back by ${when(back)}. If you haven't heard from me by ${when(worry)}, try contacting me, then call for help. ${at ? `Starting point only (not my live location): https://www.google.com/maps/search/?api=1&query=${at.lat.toFixed(5)},${at.lng.toFixed(5)}` : 'No GPS location is included.'}`;
     let sent = false;
     if (navigator.share) {
       try { await navigator.share({ title: 'My ride plan', text }); sent = true; } catch (err) { if (err.name === 'AbortError') return; }
@@ -236,7 +289,7 @@ Back by ${when(back)}. If you haven't heard from me by ${when(worry)}, call 911 
     }
     store.set('checkin', { back: back.getTime() });
     closeSheets();
-    toast(sent ? `Got it. I'll remind you at ${when(back)} to check in.` : `Plan copied: paste it in a text to them. I'll remind you at ${when(back)} to check in.`);
+    toast(sent ? `Plan handed to the share app; delivery is not confirmed. I'll remind you at ${when(back)} to check in.` : `Plan copied: paste it in a text to them. I'll remind you at ${when(back)} to check in.`);
     checkinCheck();
   };
   openSheet('#sheet');
@@ -251,12 +304,18 @@ function checkinCheck() {
 $('#checkin-bar').addEventListener('click', async (e) => {
   if (e.target.closest('.x')) { store.set('checkin', null); checkinCheck(); return; }
   const text = "I'm back from my ride and OK.";
-  if (navigator.share) { try { await navigator.share({ text }); } catch (err) { if (err.name === 'AbortError') return; } }
+  let handedOff = false;
+  if (navigator.share) { try { await navigator.share({ text }); handedOff = true; } catch (err) { if (err.name === 'AbortError') return; } }
+  if (!handedOff) {
+    try { await navigator.clipboard.writeText(text); toast('Check-in copied. Paste and send it to your contact.'); }
+    catch { if (prompt('Copy and send this check-in:', text) === null) return; }
+  } else toast('Check-in handed to the share app; delivery is not confirmed.');
   store.set('checkin', null);
   checkinCheck();
 });
 
 $('#btn-sos').addEventListener('click', showSOS);
+$('#btn-sos-menu').addEventListener('click', showSOS);
 function safetyTick() { sunCheck(); huntCheck(); checkinCheck(); }
 setInterval(safetyTick, 60000);
 setTimeout(safetyTick, 1500);

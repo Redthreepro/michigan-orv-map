@@ -23,6 +23,7 @@ async function tx(mode, fn, store = 'tracks') {
     const r = fn(t.objectStore(store));
     t.oncomplete = () => resolve(r && r.result);
     t.onerror = () => reject(t.error);
+    t.onabort = () => reject(t.error || new Error('Storage transaction aborted'));
   });
 }
 const putTrack = (t) => tx('readwrite', (s) => s.put(t));
@@ -92,8 +93,13 @@ window.onTrackPos = (pos) => {
   const { latitude, longitude, accuracy, altitude } = pos.coords;
   if (accuracy > MAX_ACC_M) return;
   const p = [+latitude.toFixed(6), +longitude.toFixed(6), altitude == null ? null : Math.round(altitude * 10) / 10, pos.timestamp];
-  const seg = rec.segs[rec.segs.length - 1];
-  const last = seg[seg.length - 1];
+  let seg = rec.segs[rec.segs.length - 1];
+  let last = seg[seg.length - 1];
+  if (last && pos.timestamp - last[3] > 60000) {
+    // The screen/background may have suspended GPS. Do not invent a straight
+    // recorded path or speed across the interruption; leave a repairable gap.
+    seg = []; rec.segs.push(seg); last = null; drawRec();
+  }
   if (last && meters(last, p) < MIN_MOVE_M) return;
   if (last && p[3] - last[3] < 60000 && meters(last, p) / ((p[3] - last[3]) / 1000) > MOVING_MS) rec.moveMs = (rec.moveMs || 0) + (p[3] - last[3]);
   seg.push(p);
@@ -102,23 +108,61 @@ window.onTrackPos = (pos) => {
   saveSoon();
 };
 
-async function lockScreen() {
-  try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch {}
+let screenLockRequest = null, screenLockEpoch = 0;
+function screenAwakeNeeded() { return !!(rec && !rec.paused) || document.body.classList.contains('navigating'); }
+function screenLockUi() {
+  const warning = $('#screen-warning');
+  warning.hidden = !screenAwakeNeeded() || !!(wakeLock && !wakeLock.released);
+  warning.textContent = 'Screen may lock and pause GPS. Keep the app visible. Tap to retry staying awake.';
 }
-function unlockScreen() { if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null; }
+async function lockScreen() {
+  if (!screenAwakeNeeded() || document.visibilityState !== 'visible' || wakeLock || screenLockRequest) { screenLockUi(); return; }
+  if (!navigator.wakeLock) { screenLockUi(); return; }
+  const epoch = screenLockEpoch;
+  try {
+    screenLockRequest = navigator.wakeLock.request('screen');
+    const sentinel = await screenLockRequest;
+    if (epoch !== screenLockEpoch || !screenAwakeNeeded() || document.visibilityState !== 'visible') {
+      await sentinel.release(); return;
+    }
+    wakeLock = sentinel;
+    sentinel.addEventListener('release', () => {
+      if (wakeLock !== sentinel) return;
+      wakeLock = null; screenLockUi();
+      // Some phones release the lock without a visibility event. Retry while
+      // still riding, but do not spin on an unsupported/denied API.
+      if (screenAwakeNeeded() && document.visibilityState === 'visible') setTimeout(lockScreen, 1000);
+    });
+  } catch { /* The persistent warning explains the failure; GPS is still usable. */ }
+  finally { screenLockRequest = null; screenLockUi(); }
+}
+function unlockScreen() {
+  if (screenAwakeNeeded()) { screenLockUi(); return; }
+  ++screenLockEpoch;
+  const sentinel = wakeLock; wakeLock = null;
+  if (sentinel) sentinel.release().catch(() => {});
+  screenLockUi();
+}
+$('#screen-warning').addEventListener('click', lockScreen);
+setInterval(() => { if (screenAwakeNeeded()) lockScreen(); }, 15000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && rec && !rec.paused) lockScreen();
-  if (document.visibilityState === 'hidden' && rec) putTrack(rec).catch(() => {});
+  if (document.visibilityState === 'visible') lockScreen();
+  if (document.visibilityState === 'hidden' && rec) putTrack(rec).catch(() => toast('Ride save failed. Keep the app open and free storage space.'));
 });
 
-function startRec() {
+let recStarting = false;
+async function startRec() {
+  if (rec || recStarting) return;
+  recStarting = true;
   const now = Date.now();
-  rec = { id: 't' + now, name: 'Ride ' + fmtDate(now), start: now, segs: [[]], done: false, paused: false };
-  putTrack(rec);
+  const next = { id: 't' + now, name: 'Ride ' + fmtDate(now), start: now, segs: [[]], done: false, paused: false };
+  try { await putTrack(next); rec = next; }
+  catch { toast('Recording could not start: phone storage is unavailable. Free space and try again.'); return; }
+  finally { recStarting = false; }
   ensureGps();
   lockScreen();
   refreshRecUi();
-  toast('Recording. Keep the app open. The screen will stay on.');
+  toast('Recording. Keep the app open and check that your screen stays on.');
   if (window.offerStartPhoto) offerStartPhoto();
   if (window.cloudRide) cloudRide('start', rec);
 }
@@ -137,7 +181,7 @@ async function stopRec() {
   if (!rec.segs.length || s.mi < 0.01) {
     if (!confirm('This ride has almost no distance. Save it anyway?')) {
       $('#photo-bar').hidden = true;
-      await delTrack(rec.id); rec = null; drawRec(); unlockScreen(); refreshRecUi(); renderList(); return;
+      await delTrack(rec.id); if (window.cloudRide) cloudRide('ended'); rec = null; drawRec(); unlockScreen(); refreshRecUi(); renderList(); return;
     }
   }
   rec.done = true; rec.end = Date.now();
@@ -240,10 +284,8 @@ function refreshRideActions() {
   b.innerHTML = (rec.paused ? PLAY_SVG : PAUSE_SVG) + `<span>${rec.paused ? 'Resume' : 'Pause'}</span>`;
 }
 function hereNow() {
-  if (meMarker) return meMarker.getLatLng();
-  const seg = rec && rec.segs.flat();
-  const p = seg && seg[seg.length - 1];
-  return p ? L.latLng(p[0], p[1]) : null;
+  const fix = currentGpsFix();
+  return fix ? L.latLng(fix.lat, fix.lng) : null;
 }
 const timeNow = () => new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 async function dropWaypoint(type, name, extra) {

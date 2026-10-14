@@ -69,11 +69,12 @@ const clock = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minut
 const day = (t) => (new Date(t).toDateString() === new Date().toDateString() ? '' : ' ' + new Date(t).toLocaleDateString([], { weekday: 'short' }));
 const ago = (ms) => { const m = Math.round(ms / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ${m % 60} min ago`; };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const watchLocationValid = (p) => p && Number.isFinite(p.lat) && Math.abs(p.lat) <= 90 && Number.isFinite(p.lng) && Math.abs(p.lng) <= 180;
 const pairs = (a) => { const o = []; for (let i = 0; i + 1 < (a || []).length; i += 2) o.push([a[i], a[i + 1]]); return o; };
 
 // where the rider probably is now: along the plan from the closest point to their last real fix
 function estimate(d) {
-  if (!d || d.status !== 'riding' || !d.last) return null;
+  if (!d || d.status !== 'riding' || !watchLocationValid(d.last) || !Number.isFinite(d.last.t)) return null;
   const age = Date.now() - d.last.t;
   if (age < STALE_MS) return null;
   const mph = d.mph > 3 ? Math.min(d.mph, 30) : 17;
@@ -101,22 +102,24 @@ function render() {
   if (!d) return;
   $('#title').textContent = `${d.name || 'Rider'}'s ride${d.title ? ' · ' + d.title : ''}`;
   const st = $('#status'), sub = $('#sub');
-  const last = d.last;
+  const last = watchLocationValid(d.last) ? d.last : null;
+  const emergency = watchLocationValid(d.sos) ? d.sos : null;
   const age = last ? Date.now() - last.t : Infinity;
   const est = estimate(d);
   st.className = d.status || '';
   if (d.status === 'sos') {
     st.textContent = 'Emergency alert';
-    const s = d.sos || last;
+    const s = emergency;
+    const label = s ? s.source === 'manual' ? 'Manually selected location (not GPS)' : s.source === 'gps' ? `GPS fix from ${clock(s.t)}${day(s.t)}${Number.isFinite(s.accuracy) ? ` (accuracy ±${Math.round(s.accuracy)} m)` : ''}` : 'Unverified location from an older app; confirm with the rider' : 'Current emergency location unavailable';
     $('#sos').style.display = 'block'; $('#sos').style.background = '';
-    $('#sos').innerHTML = `${esc(d.name || 'The rider')} sent an emergency alert at ${clock(d.statusAt)}${day(d.statusAt)}.<br>Location: ${s ? `${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}` : 'unknown'}.<br>Try calling them. If you can't reach them, <a href="tel:911">call 911</a> and read them these numbers.`;
+    $('#sos').innerHTML = `${esc(d.name || 'The rider')} sent an emergency alert at ${clock(d.statusAt)}${day(d.statusAt)}.<br>${label}${s ? `: ${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}` : ''}.<br>Try calling them. If you can't reach them, <a href="tel:911">call 911</a> and describe what you know.${s ? ' Explain the location source and time shown above.' : ' The last ride position, if shown, is not a confirmed emergency location.'}`;
   } else $('#sos').style.display = 'none';
   if (d.status !== 'sos' && d.sosCleared && Date.now() - d.sosCleared < 6 * 3600000) {
     $('#sos').style.display = 'block'; $('#sos').style.background = '#2e7d32';
     $('#sos').textContent = `${d.name || 'The rider'} cancelled the emergency alert at ${clock(d.sosCleared)}${day(d.sosCleared)}: they're OK.`;
   } else if (d.status !== 'sos') $('#sos').style.background = '';
   if (d.status === 'riding') {
-    if (est) { st.className = 'stale'; st.textContent = `No signal since ${clock(last.t)}${day(last.t)} (${ago(age)})`; }
+    if (est) { st.className = 'stale'; st.textContent = `No position update since ${clock(last.t)}${day(last.t)} (${ago(age)})`; }
     else st.textContent = last ? `Riding · updated ${ago(age)}` : 'Ride started · waiting for the first position';
   } else if (d.status === 'paused') st.textContent = `Stopped since ${clock(d.statusAt)}${day(d.statusAt)}`;
   else if (d.status === 'camp') st.textContent = `Stopped for the night at camp since ${clock(d.statusAt)}${day(d.statusAt)}`;
@@ -127,13 +130,13 @@ function render() {
   if (d.mi) bits.push(`${d.mi.toFixed(1)} mi`);
   if (d.mph) bits.push(`avg ${Math.round(d.mph)} mph`);
   if (est) bits.push(est.kind === 'route' ? `orange = estimated, moving along their planned route at ~${Math.round(est.mph)} mph${est.done ? ' (end of the plan)' : ''}`
-    : `probably within ${Math.max(1, Math.round(est.radius / 1609.344))} mi of the last real position`);
+    : `illustrative estimate only: ${Math.max(1, Math.round(est.radius / 1609.344))} mi around the last GPS fix; the rider may be outside this area`);
   sub.textContent = bits.join(' · ');
   $('#legend').style.display = d.status === 'idle' ? 'none' : '';
 
   planLine.setLatLngs(pairs(d.plan));
   if (last && d.status !== 'idle') { realDot.setLatLng([last.lat, last.lng]).addTo(map); } else map.removeLayer(realDot);
-  if (d.status === 'sos' && (d.sos || last)) sosDot.setLatLng([(d.sos || last).lat, (d.sos || last).lng]).addTo(map); else map.removeLayer(sosDot);
+  if (d.status === 'sos' && emergency) sosDot.setLatLng([emergency.lat, emergency.lng]).addTo(map); else map.removeLayer(sosDot);
   map.removeLayer(estDot); map.removeLayer(estArea); estLine.setLatLngs([]);
   if (est && est.kind === 'route') { estLine.setLatLngs(est.path); estDot.setLatLng(est.at).addTo(map); }
   if (est && est.kind === 'area') estArea.setLatLng([last.lat, last.lng]).setRadius(est.radius).addTo(map);
@@ -142,6 +145,7 @@ function render() {
   if (follow && map.getSize().x > 0) {
     const b = L.latLngBounds([]);
     if (last && d.status !== 'idle') b.extend([last.lat, last.lng]);
+    if (d.status === 'sos' && emergency) b.extend([emergency.lat, emergency.lng]);
     if (est && est.kind === 'route') b.extend(est.at);
     if (est && est.kind === 'area') b.extend(estArea.getBounds());
     if (!fitted && pathLine.getLatLngs().length) b.extend(pathLine.getBounds());
@@ -172,7 +176,7 @@ else {
   db = firebase.firestore();
   if (EMU) db.useEmulator('127.0.0.1', 8080);
   db.collection('watch').doc(id).onSnapshot((s) => {
-    if (!s.exists) { doc = null; $('#status').textContent = 'This link isn\'t active anymore. Ask for a new one.'; $('#sub').textContent = ''; $('#legend').style.display = 'none'; return; }
+    if (!s.exists) { doc = null; if (unsubPts) unsubPts(); unsubPts = null; rideKey = null; planLine.setLatLngs([]); pathLine.setLatLngs([]); estLine.setLatLngs([]); [realDot, sosDot, estDot, estArea].forEach((layer) => map.removeLayer(layer)); $('#sos').style.display = 'none'; $('#status').textContent = 'This link isn\'t active anymore. Ask for a new one.'; $('#sub').textContent = ''; $('#legend').style.display = 'none'; return; }
     doc = s.data();
     if (doc.rideKey !== rideKey) watchPoints(doc.rideKey);
     render();

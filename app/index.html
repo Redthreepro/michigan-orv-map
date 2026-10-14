@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Michigan ORV Map</title>
 <meta name="theme-color" content="#1b1f1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=55">
+<link rel="stylesheet" href="style.css?v=63">
 </head>
 <body>
 <div id="map"></div>
@@ -33,6 +33,10 @@
 
 <div id="trace-bar" hidden>
   <div class="trace-main"><b id="trace-text"></b><small id="trace-sub"></small></div>
+  <div id="trace-method" class="trace-method" hidden>
+    <button id="btn-trace-trails" aria-pressed="true">Follow trails</button>
+    <button id="btn-trace-draw" aria-pressed="false">Draw by hand</button>
+  </div>
   <div class="trace-btns">
     <button id="btn-trace-undo" class="ghost small">Undo</button>
     <button id="btn-trace-cancel" class="ghost small">Cancel</button>
@@ -41,6 +45,7 @@
 </div>
 
 <div id="chips">
+  <button id="screen-warning" class="chip alert" hidden aria-live="polite"></button>
   <button id="rec-bar" class="chip" hidden><i></i><span></span></button>
   <button id="photo-bar" class="chip" hidden><b>&#128247;</b><span>Take a start photo</span><em class="x" aria-label="No thanks">&times;</em></button>
   <button id="hunt-bar" class="chip" hidden><b>!</b><span></span></button>
@@ -53,6 +58,7 @@
 </div>
 
 <div id="fabs">
+  <button id="btn-sos" class="fab sos-fab" aria-label="SOS / emergency">SOS</button>
   <button id="btn-compass" class="fab" hidden aria-label="Heading up or north up">
     <svg viewBox="0 0 24 24"><path d="M12 2 8 12h8z" fill="#e53935"/><path d="M12 22 8 12h8z" fill="currentColor"/></svg>
   </button>
@@ -95,7 +101,7 @@
 <!-- layers + settings -->
 <section id="panel-layers" class="sheet" hidden>
   <button class="close" aria-label="Close">&times;</button>
-  <div class="rec-row"><button id="btn-sos" class="ghost sos">SOS / emergency</button><button id="btn-laws" class="ghost">Rules &amp; permits</button></div>
+  <div class="rec-row"><button id="btn-sos-menu" class="ghost sos">SOS / emergency</button><button id="btn-laws" class="ghost">Rules &amp; permits</button></div>
   <button id="btn-cloud" class="ghost cloud-btn">Crew &amp; Ride Watch (live link for family)</button>
   <button id="btn-updates" class="ghost">DNR trail updates (last 60 days)</button>
   <div class="rec-row"><button id="btn-loop" class="ghost">Find me a loop</button><button id="btn-plans" class="ghost">My saved ride plans</button></div>
@@ -287,7 +293,7 @@
   <h2>Record a ride</h2>
   <p class="hint" id="rec-live"></p>
   <div id="rec-controls"></div>
-  <p class="hint">Keep the app open on screen while you ride. Phones stop GPS for web apps when the screen is off or you switch apps. The screen stays on while recording, so plug in if you can.</p>
+  <p class="hint">Keep the app open on screen while you ride. The app tries to keep the screen awake and warns if it cannot. Locking the phone or switching apps can pause GPS. If a section is missed, open the saved ride → Edit → Fill gap or Add a missed section. Plug in for longer rides.</p>
   <h2>Saved rides</h2>
   <div id="ride-list"></div>
   <button class="ghost" id="btn-merge">Merge rides</button>
@@ -332,28 +338,28 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=55"></script>
-<script src="tracks.js?v=55"></script>
-<script src="routing.js?v=55"></script>
-<script src="places.js?v=55"></script>
-<script src="plan.js?v=55"></script>
-<script src="nav.js?v=55"></script>
-<script src="offline.js?v=55"></script>
-<script src="gpx.js?v=55"></script>
-<script src="weather.js?v=55"></script>
-<script src="progress.js?v=55"></script>
-<script src="details.js?v=55"></script>
-<script src="edit.js?v=55"></script>
-<script src="select.js?v=55"></script>
-<script src="updates.js?v=55"></script>
-<script src="laws.js?v=55"></script>
-<script src="safety.js?v=55"></script>
-<script src="merge.js?v=55"></script>
-<script src="spots.js?v=55"></script>
-<script src="cloud.js?v=55"></script>
-<script src="colors.js?v=55"></script>
-<script src="loops.js?v=55"></script>
-<script src="conditions.js?v=55"></script>
-<script src="stats.js?v=55"></script>
+<script src="app.js?v=63"></script>
+<script src="tracks.js?v=63"></script>
+<script src="routing.js?v=63"></script>
+<script src="places.js?v=63"></script>
+<script src="plan.js?v=63"></script>
+<script src="nav.js?v=63"></script>
+<script src="offline.js?v=63"></script>
+<script src="gpx.js?v=63"></script>
+<script src="weather.js?v=63"></script>
+<script src="progress.js?v=63"></script>
+<script src="details.js?v=63"></script>
+<script src="edit.js?v=63"></script>
+<script src="select.js?v=63"></script>
+<script src="updates.js?v=63"></script>
+<script src="laws.js?v=63"></script>
+<script src="safety.js?v=63"></script>
+<script src="merge.js?v=63"></script>
+<script src="spots.js?v=63"></script>
+<script src="cloud.js?v=63"></script>
+<script src="colors.js?v=63"></script>
+<script src="loops.js?v=63"></script>
+<script src="conditions.js?v=63"></script>
+<script src="stats.js?v=63"></script>
 </body>
 </html>

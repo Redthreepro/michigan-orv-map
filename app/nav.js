@@ -171,6 +171,7 @@ function startNav() {
   ride.on = true;
   for (const r of planLegs) r.man = null;
   document.body.classList.add('navigating');
+  lockScreen();
   $('#nav-banner').hidden = false;
   setBanner({ icon: 'arrow', text: 'Waiting for GPS…', sub: 'Keep the screen on while you ride. Set Auto-Lock to Never.' });
   closeSheets();
@@ -185,6 +186,7 @@ function startNav() {
 function stopNav() {
   ride.on = false;
   document.body.classList.remove('navigating');
+  unlockScreen();
   $('#nav-banner').hidden = true;
   if (map.setBearing) map.setBearing(0);
   updateCompass();

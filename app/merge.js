@@ -31,18 +31,19 @@ window.showMergePicker = showMergePicker;
 
 async function mergeRides(list) {
   list = list.slice().sort((a, b) => a.start - b.start);
-  const segs = [], manual = [], taps = {}, camps = [], parts = [];
+  const segs = [], manual = [], taps = {}, traceMethods = {}, camps = [], parts = [];
   for (const r of list) {
     const from = segs.length;
     r.segs.forEach((s, i) => {
       segs.push(s);
       if ((r.manual || []).includes(i)) manual.push(from + i);
       if (r.taps && r.taps[i]) taps[from + i] = r.taps[i];
+      if (r.traceMethods && r.traceMethods[i]) traceMethods[from + i] = r.traceMethods[i];
     });
     camps.push(...(r.camps || []));
     if (r.parts) for (const p of r.parts) parts.push({ meta: p.meta, from: from + p.from, to: from + p.to }); // merging a merged ride: keep the originals
     else {
-      const { segs: _s, manual: _m, taps: _t, parts: _p, ...meta } = r;
+      const { segs: _s, manual: _m, taps: _t, traceMethods: _tm, parts: _p, ...meta } = r;
       parts.push({ meta, from, to: segs.length });
     }
   }
@@ -50,7 +51,7 @@ async function mergeRides(list) {
   if (name === null) return;
   const now = Date.now();
   const merged = { id: 't' + now, name: (name.trim() || list[0].name).slice(0, 80), start: Math.min(...list.map((r) => r.start)),
-    end: Math.max(...list.map((r) => r.end || r.start)), done: true, segs, manual, taps, camps, parts };
+    end: Math.max(...list.map((r) => r.end || r.start)), done: true, segs, manual, taps, traceMethods, camps, parts };
   await putTrack(merged);
   for (const r of list) { hideTrack(r.id); await delTrack(r.id); }
   closeSheets();
@@ -71,11 +72,12 @@ async function separateRide(t) {
     const j = parts.findIndex((p) => ts >= p.meta.start && ts <= (p.meta.end || p.meta.start));
     return j >= 0 ? j : 0;
   });
-  const out = parts.map((p) => ({ ...p.meta, segs: [], manual: [], taps: {}, camps: [] }));
+  const out = parts.map((p) => ({ ...p.meta, segs: [], manual: [], taps: {}, traceMethods: {}, camps: [] }));
   t.segs.forEach((s, i) => {
     const r = out[owner[i]];
     if ((t.manual || []).includes(i)) r.manual.push(r.segs.length);
     if (t.taps && t.taps[i]) r.taps[r.segs.length] = t.taps[i];
+    if (t.traceMethods && t.traceMethods[i]) r.traceMethods[r.segs.length] = t.traceMethods[i];
     r.segs.push(s);
   });
   for (const c of t.camps || []) {
@@ -113,7 +115,7 @@ function stopLabel(s) {
   return overnight ? `Overnight stop (${a.toLocaleDateString(undefined, { weekday: 'short' })} ${time})` : `${durText(s.to - s.from)} stop at ${time}`;
 }
 async function splitAt(t, cutTime) {
-  const a = { ...t, id: t.id, segs: [], manual: [], taps: {} }, b = { ...t, id: 't' + Date.now(), segs: [], manual: [], taps: {} };
+  const a = { ...t, id: t.id, segs: [], manual: [], taps: {}, traceMethods: {} }, b = { ...t, id: 't' + Date.now(), segs: [], manual: [], taps: {}, traceMethods: {} };
   delete a.parts; delete b.parts; // splitting a merged ride by time: its part list no longer applies
   t.segs.forEach((s, k) => {
     const isManual = (t.manual || []).includes(k);
@@ -122,6 +124,7 @@ async function splitAt(t, cutTime) {
       if (!part.length) continue;
       if (isManual) r.manual.push(r.segs.length);
       if (isManual && t.taps && t.taps[k] && part.length === s.length) r.taps[r.segs.length] = t.taps[k];
+      if (isManual && t.traceMethods && t.traceMethods[k]) r.traceMethods[r.segs.length] = t.traceMethods[k];
       r.segs.push(part);
     }
   });
