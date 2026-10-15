@@ -92,6 +92,7 @@ async function savedSet() {
 let downloading = false;
 async function download(urls, label) {
   if (downloading) return;
+  if (!urls.length) return toast('Plan a trip or select an area before downloading.');
   if (!navigator.onLine) return toast('You need signal to download. Do this before you head out.');
   downloading = true;
   document.querySelectorAll('.dl-btn').forEach((b) => { b.disabled = true; });
@@ -100,32 +101,42 @@ async function download(urls, label) {
   const bar = prog.querySelector('.bar span');
   const status = $('#save-status');
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  const cache = await caches.open(TILE_CACHE);
-  const have = await savedSet();
-  const todo = urls.filter((u) => !have.has(u));
-  let done = urls.length - todo.length, failed = 0, i = 0;
-  const show = () => {
-    bar.style.width = (100 * done / urls.length).toFixed(1) + '%';
-    status.textContent = `${label}: ${done.toLocaleString()} / ${urls.length.toLocaleString()} tiles` + (failed ? ` · ${failed} failed` : '');
-  };
-  show();
-  async function worker() {
-    while (i < todo.length) {
-      const url = todo[i++];
-      try {
-        const r = await fetch(url, { mode: 'cors' });
-        if (r.ok) await cache.put(url, r); else failed++;
-      } catch { failed++; }
-      done++;
-      if (done % 10 === 0 || done === urls.length) show();
+  try {
+    const cache = await caches.open(TILE_CACHE);
+    const have = await savedSet();
+    const todo = urls.filter((u) => !have.has(u));
+    let done = urls.length - todo.length, failed = 0, i = 0;
+    const show = () => {
+      bar.style.width = (100 * done / urls.length).toFixed(1) + '%';
+      status.textContent = `${label}: ${done.toLocaleString()} / ${urls.length.toLocaleString()} tiles` + (failed ? ` · ${failed} failed` : '');
+    };
+    show();
+    async function worker() {
+      while (i < todo.length) {
+        const url = todo[i++];
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 20000);
+          try {
+            const r = await fetch(url, { mode: 'cors', signal: controller.signal });
+            if (r.ok) await cache.put(url, r); else failed++;
+          } finally { clearTimeout(timeout); }
+        } catch { failed++; }
+        done++;
+        if (done % 10 === 0 || done === urls.length) show();
+      }
     }
+    await Promise.all(Array.from({ length: 8 }, worker));
+    status.textContent = failed ? `Done, but ${failed} tiles failed. Tap download again to retry them.` : `${label}: saved. Works with no signal.`;
+    toast(failed ? 'Saved with some gaps' : `${label} saved for offline`);
+  } catch {
+    status.textContent = 'Download failed: phone storage is unavailable. Free space and retry.';
+    toast('Map download failed. Offline coverage is not confirmed.');
+  } finally {
+    downloading = false;
+    document.querySelectorAll('.dl-btn').forEach((b) => { b.disabled = false; });
+    refreshOffline();
   }
-  await Promise.all(Array.from({ length: 8 }, worker));
-  downloading = false;
-  document.querySelectorAll('.dl-btn').forEach((b) => { b.disabled = false; });
-  status.textContent = failed ? `Done, but ${failed} tiles failed. Tap download again to retry them.` : `${label}: saved. Works with no signal.`;
-  toast(failed ? 'Saved with some gaps' : `${label} saved for offline`);
-  refreshOffline();
 }
 
 // ---------- readiness checks ----------
@@ -298,7 +309,10 @@ function finishWelcome() {
 $('#btn-welcome-go').addEventListener('click', finishWelcome);
 $('#panel-welcome .close').addEventListener('click', () => store.set('welcomed', 1));
 $('#btn-help').addEventListener('click', showWelcome);
-if (!store.get('welcomed', 0)) setTimeout(showWelcome, 600);
+if (!store.get('welcomed', 0)) setTimeout(() => {
+  // A rider may open SOS or another task before this delayed prompt runs.
+  if (![...document.querySelectorAll('.sheet')].some((sheet) => !sheet.hidden)) showWelcome();
+}, 600);
 
 if (IS_MOBILE && !isStandalone() && store.get('welcomed', 0)) {
   let seen = false;

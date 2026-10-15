@@ -1,0 +1,170 @@
+Michigan ORV Map — app review, October 14, 2026
+
+Scope
+Reviewed the app's map/search and sheet controls, GPS callbacks, recording and
+ride editing, routing and trip planning, offline downloads and service worker,
+GPX/backup flows, places/photos, weather/conditions, progress/statistics, cloud
+sharing, Ride Watch viewer, deployment checks and privacy descriptions.
+This is a source review and local browser/regression pass, not field validation
+or a certification of trail legality, emergency response, or background GPS.
+
+Implemented in codex/whole-app-reliability
+
+1. SOS/check-in location provenance: emergency paths no longer call the map-center
+   fallback. GPS must have an actual valid fix, no older than 30 seconds, and its
+   accuracy/time is shown. Fix freshness is checked again on share, SMS and family
+   actions. An arriving fix updates the open card; an expired fix disappears.
+   A rider may explicitly confirm a map-center location, which remains labeled
+   manual in the message, stored alert and viewer. No-location emergency actions
+   stay available. Hospital proximity is labeled by the source and straight-line
+   distance; it is omitted when emergency location is unavailable.
+
+2. Family delivery status: pending, confirmed and failed are distinct, including
+   cancellation. Server acknowledgement means the family link was updated, not
+   that a person saw it. Offline cancellation no longer waits on a server read.
+   Matching server snapshots reconcile pending status after reopening. The
+   viewer does not substitute an old ride fix for a missing emergency location;
+   older alerts without provenance are explicitly unverified.
+
+3. GPS continuity: the location button preserves GPS during navigation. Trip
+   starts and quick waypoint/photo marks require a recent fix. New shared rides
+   reset their old fix; sign-out/account changes stop old local sharing state.
+
+4. Offline updates: installed app-shell caches are immutable. New code waits for
+   an explicit update; the update control refuses to reload during recording or
+   navigation. Repair does not overwrite installed code from another release.
+   Missing shell files require an intact new install/update, rather than mixing
+   code versions. An old worker's first transition still follows that old
+   worker's update behavior; subsequent releases use the new protocol.
+
+5. Storage/download handling: map download errors release the controls for retry;
+   tile requests have a timeout. Backup read/export failures no longer silently
+   become successful empty backups. Starting recording requires its first record
+   to be saved. Aborted IndexedDB transactions reject. Discarding a tiny ride
+   ends its shared ride too. Return check-ins have a clipboard fallback.
+
+6. Usability: SOS has a visible main-map control while retaining its menu
+   shortcut. Page zoom is enabled, keyboard focus is visible, wake-lock copy
+   avoids guaranteeing screen behavior, and privacy copy describes emergency
+   family sharing outside an active recording. Delayed onboarding cannot replace
+   an already-open SOS/task sheet, and update prompts cannot cover sheet actions.
+
+Remaining priorities from this review
+
+HIGH — Machine selection (app/routing.js, app/plan.js): "Show everything" is also
+the default routing mode and includes narrow motorcycle trails. In the browser
+test, a manually planned trip used a motorcycle trail while no machine was
+selected. Require a machine before starting navigation, or prominently label
+the route's unverified width compatibility while preserving all-trail browsing.
+
+HIGH — Backup restore (app/gpx.js, app/spots.js) trusts the backup's shape after
+checking only its app marker, then writes records sequentially. Validate every
+record and photo URL before any writes, and make restoration recoverable/atomic.
+GPX import also accepts finite but out-of-range coordinates and coerces missing
+coordinate attributes to zero. These should be rejected before saving.
+
+HIGH — In-progress persistence (app/tracks.js) still suppresses failures in its
+debounced and visibility-triggered saves. Starting-recording failure is handled
+in this patch, but later quota/storage failures need a persistent visible warning,
+retry state, and an export path. Do not treat the initial successful write as
+proof the whole ride will remain saved.
+
+MEDIUM — Trip calculation (app/plan.js) reads mutable global plan state across
+GPS and graph awaits. Rapid edits/clear while a calculation is pending need a
+revision token and cancellation tests so an older calculation cannot reopen a
+sheet or render a route against the wrong stops. Loading/failure should clear
+or explicitly label obsolete directions.
+
+MEDIUM — General sheets (app/app.js, app/index.html) need a consistent keyboard
+and screen-reader policy: names, initial focus, Escape, focus return, and clear
+modal/nonmodal behavior. The current visible focus improvement is only a start.
+
+MEDIUM — Family tracking needs real-device and Firebase emulator integration
+tests for reconnect, auth changes, persistence unavailable, multiple open tabs,
+and queued-write replay across an actual browser restart. GPS freshness is not
+the same as accuracy; poor fixes remain visibly labeled with their uncertainty.
+Firestore persistence initialization currently tolerates failure, so pending
+does not guarantee the update survives closing the app.
+
+MEDIUM — Firestore rules protect basic ownership, but do not validate most
+document shapes or preserve immutable owner fields on owner updates. Add schema
+constraints and emulator coverage before widening crew use. Viewer links are
+bearer links; anyone who obtains one can read its ride data.
+
+Product polish — Layers doubles as the app's feature menu; planning, saved
+selections and recorded rides use separate concepts and entry points. A future
+UI pass should make Plan / Ride / Saved / Offline easy to find, give icon controls
+visible labels or onboarding help, and retain obvious SOS access. Validate the
+layout on small landscape screens as well as phone portrait.
+
+Validation
+node tools/check-names.js
+node --test tests/*.test.cjs
+git diff --check
+
+The tests execute production functions with simulated GPS, DOM, clock, storage,
+and server acknowledgements; they do not contact emergency services or the
+production Firebase project. CI checks run for PRs and before Pages deployments.
+Local browser checks cover startup, emergency-card rendering and key panels.
+Physical-device offline navigation, background/resume behavior, actual SMS
+handoff and live family receipt have not been exercised.
+
+Emergency wording reference:
+https://www.911.gov/calling-911/frequently-asked-questions/
+
+Follow-up: missing track repair and screen lock
+
+The rider reported incomplete hand-added sections after the screen locked.
+Two source defects fit that symptom: the trail-progress index applied its 250 m
+GPS gap cutoff to explicit manual geometry, and tracing silently replaced long
+mapped loops with straight lines. Both are corrected. Existing manual sections
+now match continuously without resaving; genuinely unrecorded GPS gaps remain
+unfilled until reconstructed by the rider.
+
+Edit now offers possible recording gaps with recorded endpoints, Follow trails
+and Draw by hand, complete previews, red unresolved stretches, and Save full
+section. Saving a selected old gap splits its invented GPS connection while
+retaining every recorded point. Save failures retain the editable preview and
+original ride; repeated Save cannot duplicate a section. Midpoint handles now
+interpolate along sparse geometry instead of landing on its endpoint. Drawing
+mode metadata survives merge/separate/split and section deletion.
+
+Recording and navigation retry released screen wake locks and expose a warning
+when unavailable. Long GPS interruptions start a new recorded segment, rather
+than inventing a straight track. This does not provide background GPS or guarantee
+recording after a phone is locked. Real-device sleep/resume testing remains needed.
+
+43 regression tests pass. The browser repair walkthrough uses the synthetic
+tests/fixtures/recording-gap.gpx; the rider's real ride has not been accessed or
+modified. Changes remain local until deployed.
+
+Follow-up: following, junction guidance and horizontal riding
+
+Recording and resume now enable follow, and the location control cannot turn it
+off during a ride. Dragging enters temporary browsing; after 15 seconds without
+dragging, a fresh fix recenters the map unless a sheet is open or recording is
+paused. Follow remains available immediately. GPS/recording/paused status stays
+visible in the compact ride view.
+
+Shared heading-up works for recording without a planned route. GPS course or
+sufficient accurate displacement supplies travel direction; permission-gated
+iPhone compass readings supply phone direction at stops. Screen orientation,
+zero/north, uncalibrated readings and expiry are handled. Last travel is labeled
+and holds map orientation rather than making a stopped map suddenly flip north.
+Actual iPhone compass calibration and magnetic-mount behavior still need a ride test.
+
+Real junction maneuvers survive noise filtering, including straight-through
+decisions and closely spaced turns. A turn remains visible close to its junction.
+Reliable travel opposite the planned direction produces a direction warning.
+An off-route fix projected onto an endpoint cannot announce arrival. Rerouting
+is limited to active navigation rather than changing a trip during casual recording.
+
+Horizontal ride controls are compact: a turn card, speed/distance, heading/status,
+and More / SOS / compass / Follow. The center of the map stays visible; the
+secondary tools remain available under More. In the local 844x390 replay, the
+rendered location-dot center and map center were both [422,195]. Portrait was
+also checked. The replay uses synthetic GPS on a development-only local server.
+
+Native iPhone background recording is planned in store/IPHONE-TRACKING-PLAN.txt.
+The developer account is available; Mac/Xcode access and physical-device tests
+remain to be established. A native recorder has not been built or claimed working.

@@ -94,11 +94,12 @@ async function ensureName() {
 }
 function onUserChanged() {
   if (me && store.get('cloudUid', null) && store.get('cloudUid', null) !== me.uid) {
+    ++sosWriteToken; store.set('sosWriteState', null); clearInterval(W.timer); W.fix = null; W.buf = [];
     W.id = null; W.active = false; store.set('watchId', null); store.set('watchRide', null); store.set('sosSent', 0);
     C.code = null; store.set('crew', null);
   }
   if (me) store.set('cloudUid', me.uid);
-  if (me) { startCrew(); resumeWatch(); } else { stopCrew(); }
+  if (me) { startCrew(); resumeWatch(); observeSOSWrite(); } else { ++sosWriteToken; if (sosObserver) sosObserver(); sosObserver = null; stopCrew(); W.active = false; W.fix = null; W.buf = []; clearInterval(W.timer); }
   refreshCloudSheet();
 }
 
@@ -254,6 +255,7 @@ async function setupWatch(fresh) {
   W.id = randomId(20);
   await fb.db.collection('watch').doc(W.id).set({ owner: me.uid, name: myName(), status: 'idle', created: Date.now() });
   store.set('watchId', W.id);
+  store.set('sosSent', 0); setSOSWriteState(null); ++sosWriteToken; observeSOSWrite();
   if (window.isRecording && isRecording() && W.auto) await beginWatch(currentRide());
   toast('Your family link is ready. Tap "Send my family link".');
 }
@@ -277,11 +279,11 @@ function planLine() {
 async function beginWatch(rec) {
   if (!rec || !W.id || !me) return;
   await cloud();
-  W.active = true; W.rideKey = rec.id; W.buf = [];
+  W.active = true; W.rideKey = rec.id; W.buf = []; W.fix = null;
   store.set('watchRide', rec.id);
   const sos = !!store.get('sosSent', 0);
   // merge, so an emergency alert already on the link survives the new ride starting
-  await fb.db.collection('watch').doc(W.id).set({ owner: me.uid, name: myName(), title: rec.name, rideKey: rec.id, started: rec.start,
+  fb.db.collection('watch').doc(W.id).set({ owner: me.uid, name: myName(), title: rec.name, rideKey: rec.id, started: rec.start,
     ...(sos ? {} : { status: rec.paused ? 'paused' : 'riding', statusAt: Date.now() }), plan: planLine(), mi: 0, mph: 0, last: null,
     ended: fb.FV.delete(), sent: Date.now() }, { merge: true }).catch(() => {});
   purgeOldPoints(rec.id);
@@ -334,31 +336,77 @@ window.cloudPoint = (p) => { if (W.active) W.buf.push([p[0], p[1], p[3]]); };
 window.cloudRide = async (ev, rec) => {
   if (ev === 'start') {
     if (!W.id || !W.auto || !store.get('cloud', 0)) return;
-    try { await cloud(); if (me) { await beginWatch(rec); toast('Sharing this ride live with your family link'); } } catch {}
+    try { await cloud(); if (me) { await beginWatch(rec); toast('Ride Watch updates queued. Your family link updates when the server receives them.'); } } catch {}
     return;
   }
   if (!W.active) return;
   if (ev === 'paused' || ev === 'riding' || ev === 'camp' || ev === 'sos') flushWatch({ status: ev, statusAt: Date.now() });
   if (ev === 'ended') stopWatch('ended');
 };
-window.cloudSOS = async (lat, lng) => {
+// The write promise resolves only after the server acknowledges it. Do not await
+// it in the UI: offline writes can remain pending indefinitely.
+let sosWriteToken = 0, sosObserver = null;
+function observeSOSWrite() {
+  if (sosObserver) sosObserver();
+  sosObserver = null;
+  if (!fb || !me || !W.id) return;
+  sosObserver = fb.db.collection('watch').doc(W.id).onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
+    if (!snapshot.exists || snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) return;
+    const d = snapshot.data(), at = store.get('sosWriteAt', 0), state = cloudSOSStatus();
+    if (state === 'pending' && d.status === 'sos' && d.statusAt === at) setSOSWriteState('confirmed');
+    if (state === 'pending-clear' && d.sosCleared === at) { store.set('sosSent', 0); setSOSWriteState('cleared'); }
+  }, () => {});
+}
+function setSOSWriteState(state) {
+  store.set('sosWriteState', state);
+  window.dispatchEvent(new Event('soschange'));
+}
+function queueSOSUpdate(update, clearing) {
+  const token = ++sosWriteToken;
+  const oldSent = store.get('sosSent', 0);
+  store.set('sosWriteAt', update.statusAt);
+  const write = fb.db.collection('watch').doc(W.id).update(update);
+  if (!clearing) store.set('sosSent', update.statusAt);
+  setSOSWriteState(clearing ? 'pending-clear' : 'pending');
+  Promise.resolve(write).then(() => {
+    if (token !== sosWriteToken) return;
+    if (clearing) store.set('sosSent', 0);
+    setSOSWriteState(clearing ? 'cleared' : 'confirmed');
+  }, () => {
+    if (token !== sosWriteToken) return;
+    store.set('sosSent', oldSent);
+    setSOSWriteState(clearing ? 'clear-failed' : 'failed');
+  });
+  return { state: clearing ? 'pending-clear' : 'pending' };
+}
+window.cloudSOS = async (at = null) => {
+  if (!W.id) return false;
+  // Reject malformed or expired fixes at this boundary too.
+  if (at && (!validLocation(at) || !['gps', 'manual'].includes(at.source) ||
+      !Number.isFinite(at.t) || at.t > Date.now() ||
+      (at.source === 'gps' && (Date.now() - at.t > GPS_FRESH_MS || !Number.isFinite(at.accuracy) || at.accuracy < 0)))) {
+    throw new Error('Unverified emergency location');
+  }
+  await cloud();
+  if (!me) return false;
+  // Loading the SDK/auth can outlast a fix's useful age.
+  if (at && at.source === 'gps' && Date.now() - at.t > GPS_FRESH_MS) at = null;
+  const now = Date.now();
+  const sos = at ? { lat: +at.lat.toFixed(5), lng: +at.lng.toFixed(5), t: at.t, source: at.source,
+    ...(at.source === 'gps' ? { accuracy: at.accuracy } : {}) } : null;
+  return queueSOSUpdate({ status: 'sos', statusAt: now, sos, sosCleared: fb.FV.delete(), sent: now }, false);
+};
+window.cloudSOSStatus = () => store.get('sosWriteState', null);
+window.cloudSOSActive = () => !!store.get('sosSent', 0);
+window.cloudSOSClear = async () => {
   if (!W.id) return false;
   await cloud();
   if (!me) return false;
-  fb.db.collection('watch').doc(W.id).update({ status: 'sos', statusAt: Date.now(), sos: { lat: +lat.toFixed(5), lng: +lng.toFixed(5), t: Date.now() },
-    last: W.fix || { lat: +lat.toFixed(5), lng: +lng.toFixed(5), t: Date.now(), spd: null }, sent: Date.now() }).catch(() => {});
-  store.set('sosSent', Date.now());
-  return true;
-};
-window.cloudSOSActive = () => !!store.get('sosSent', 0);
-window.cloudSOSClear = async () => {
-  if (!W.id) return;
-  await cloud();
   const rec = currentRide();
-  let status = rec ? (rec.paused ? 'paused' : 'riding') : 'idle';
-  if (!rec) { try { const d = (await fb.db.collection('watch').doc(W.id).get()).data(); if (d && d.ended && d.ended >= (d.started || 0)) status = 'ended'; } catch {} }
-  await fb.db.collection('watch').doc(W.id).update({ status, statusAt: Date.now(), sosCleared: Date.now() }).catch(() => {});
-  store.set('sosSent', 0);
+  const status = rec ? (rec.paused ? 'paused' : 'riding') : 'idle';
+  // Do not wait for an online read before queuing an offline cancellation.
+  const now = Date.now();
+  return queueSOSUpdate({ status, statusAt: now, sosCleared: now, sos: fb.FV.delete() }, true);
 };
 window.cloudPlanChanged = () => { if (W.active && fb) fb.db.collection('watch').doc(W.id).update({ plan: planLine() }).catch(() => {}); };
 window.watchShared = () => !!W.id;

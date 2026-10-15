@@ -386,15 +386,30 @@ search.addEventListener('input', () => {
 
 // ---------- GPS ----------
 let watchId = null, follow = false, meMarker = null, meCircle = null;
+let gpsFix = null;
+let followPausedAt = 0;
+// A visible marker may be an old fix after the phone resumes or loses GPS.
+const GPS_FRESH_MS = 30000;
+function validLocation(p) {
+  return !!p && Number.isFinite(p.lat) && Math.abs(p.lat) <= 90 && Number.isFinite(p.lng) && Math.abs(p.lng) <= 180;
+}
+function currentGpsFix() {
+  if (!gpsFix || !meMarker || Date.now() - gpsFix.t > GPS_FRESH_MS || gpsFix.t > Date.now()) return null;
+  return { ...gpsFix };
+}
 const locBtn = $('#btn-locate');
 const meIcon = () => L.divIcon({ className: 'me-wrap', html: '<div class="me-head" hidden></div><div class="me"></div>', iconSize: [20, 20] });
 
 function setLocState() {
   locBtn.classList.toggle('on', watchId !== null && !follow);
   locBtn.classList.toggle('follow', watchId !== null && follow);
+  locBtn.setAttribute('aria-label', watchId !== null ? follow ? 'Following your location' : 'Recenter and follow' : 'My location');
+  if (window.refreshRideView) refreshRideView();
 }
 function onPos(pos) {
   const { latitude: lat, longitude: lng, accuracy, heading, speed, altitude } = pos.coords;
+  if (!validLocation({ lat, lng }) || !Number.isFinite(accuracy) || accuracy < 0 || !Number.isFinite(pos.timestamp)) return;
+  gpsFix = { lat, lng, accuracy, t: pos.timestamp, source: 'gps' };
   const ll = [lat, lng];
   if (!meMarker) {
     meMarker = L.marker(ll, { icon: meIcon(), interactive: false, zIndexOffset: 1000 }).addTo(map);
@@ -402,7 +417,7 @@ function onPos(pos) {
     map.setView(ll, Math.max(map.getZoom(), 14));
   } else {
     meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(accuracy);
-    if (follow) map.panTo(ll, { animate: true });
+    if (follow) map.panTo(ll, { animate: false });
   }
   const head = meMarker.getElement()?.querySelector('.me-head');
   if (head) {
@@ -416,7 +431,9 @@ function onPos(pos) {
   $('#scale-info').textContent = bits.join(' · ');
   if (window.onTrackPos) window.onTrackPos(pos);
   if (window.cloudFix) window.cloudFix(pos);
+  if (window.onRideFix) onRideFix(pos);
   if (window.onPlanPos) window.onPlanPos(pos);
+  window.dispatchEvent(new Event('gpschange'));
 }
 function onPosErr(err) {
   toast(err.code === 1 ? 'Location permission denied — allow it in your browser settings.' : 'No GPS fix yet…');
@@ -425,6 +442,7 @@ function onPosErr(err) {
 function stopLocate() {
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   watchId = null; follow = false;
+  gpsFix = null;
   if (meMarker) { map.removeLayer(meMarker); map.removeLayer(meCircle); meMarker = meCircle = null; }
   $('#scale-info').textContent = '';
   setLocState();
@@ -436,16 +454,17 @@ locBtn.addEventListener('click', () => {
     watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
   } else if (!follow) {
     follow = true;
+    followPausedAt = 0;
     if (meMarker) map.setView(meMarker.getLatLng(), Math.max(map.getZoom(), 14));
-  } else if (window.isRecording && window.isRecording()) {
-    follow = false;
-    toast('GPS stays on while a ride is recording');
+  } else if ((window.isRecording && window.isRecording()) || document.body.classList.contains('navigating')) {
+    // While riding this control always recenters; it must never disable follow.
+    if (meMarker) map.panTo(meMarker.getLatLng(), { animate: false });
   } else {
     stopLocate();
   }
   setLocState();
 });
-map.on('dragstart', () => { if (follow) { follow = false; setLocState(); } });
+map.on('dragstart', () => { if (follow) { follow = false; followPausedAt = Date.now(); setLocState(); } });
 
 // ---------- misc ----------
 let toastT;
@@ -458,19 +477,31 @@ function netState() { $('#net').hidden = navigator.onLine; }
 addEventListener('online', netState); addEventListener('offline', netState); netState();
 
 // When a new version finishes downloading in the background, offer a one-tap reload.
+let appRegistration = null, applyingUpdate = false;
 if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (applyingUpdate) location.reload(); });
   navigator.serviceWorker.register('sw.js').then((reg) => {
+    appRegistration = reg;
+    if (reg.waiting) $('#update-bar').hidden = false;
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
       if (!nw) return;
       nw.addEventListener('statechange', () => {
         // only when replacing an older version, not on the very first install
-        if (nw.state === 'activated' && navigator.serviceWorker.controller) $('#update-bar').hidden = false;
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) $('#update-bar').hidden = false;
       });
     });
   }).catch(() => {});
 }
-$('#update-bar').addEventListener('click', () => location.reload());
+$('#update-bar').addEventListener('click', () => {
+  if (window.traceMode && traceMode()) { toast('Finish or cancel the track edit before updating.'); return; }
+  if ((window.isRecording && isRecording()) || document.body.classList.contains('navigating')) {
+    toast('Stop and save your ride and end navigation before updating.'); return;
+  }
+  if (appRegistration && appRegistration.waiting) {
+    applyingUpdate = true; appRegistration.waiting.postMessage({ type: 'activate-update' });
+  } else location.reload();
+});
 
 loadTrails().catch(() => toast('Could not load trail data'));
 

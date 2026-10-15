@@ -68,14 +68,17 @@ function rideIndex(rides) {
     if (cell) { if (cell.length < 12) cell.push([lat, lng]); } else grid.set(key, [[lat, lng]]);
     a = Math.min(a, lat); b = Math.min(b, lng); c = Math.max(c, lat); d = Math.max(d, lng);
   };
-  for (const r of rides) for (const seg of r.segs) {
+  for (const r of rides) for (const [segIndex, seg] of r.segs.entries()) {
+    // Sparse mapped geometry is intentional for hand-added sections. The GPS
+    // gap limit must not turn an explicitly reconstructed path into fragments.
+    const manual = (r.manual || []).includes(segIndex);
     for (let i = 0; i < seg.length; i++) {
       const p = seg[i];
       add(p[0], p[1]);
       if (i === 0) continue;
       const q = seg[i - 1];
       const dist = hav(q[0], q[1], p[0], p[1]);
-      if (dist <= FILL_STEP_M || dist > FILL_MAX_M) continue;
+      if (dist <= FILL_STEP_M || (!manual && dist > FILL_MAX_M)) continue;
       const n = Math.ceil(dist / FILL_STEP_M);
       for (let k = 1; k < n; k++) add(q[0] + ((p[0] - q[0]) * k) / n, q[1] + ((p[1] - q[1]) * k) / n);
     }

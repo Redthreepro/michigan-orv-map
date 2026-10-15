@@ -38,6 +38,7 @@ button { font: inherit; color: inherit; }
 .fab { width: 54px; height: 54px; border-radius: 50%; border: 0; background: var(--panel); color: var(--text);
   box-shadow: 0 2px 10px #0007; display: grid; place-items: center; cursor: pointer; }
 .fab svg { width: 26px; height: 26px; }
+.fab[hidden] { display: none; }
 .fab.on { color: #fff; background: #1f6fe5; }
 .fab.follow { color: #fff; background: #1f6fe5; box-shadow: 0 0 0 3px #fff, 0 2px 10px #0007; }
 
@@ -107,6 +108,7 @@ dt { color: var(--muted); } dd { margin: 0; }
 .chip { pointer-events: auto; border: 0; background: #000c; color: #fff; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 18px;
   display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }
 .chip[hidden] { display: none; }
+#screen-warning { background: #8b1a1a; white-space: normal; max-width: calc(100vw - 24px); width: 380px; text-align: center; }
 #route-bar { background: #1e6bffe6; }
 #hunt-bar { background: #ff8c00f0; color: #111; }
 #hunt-bar.alert { background: #c62828f0; color: #fff; }
@@ -424,8 +426,13 @@ body.progress-colors .sw.route, body.progress-colors .sw.trail, body.progress-co
 .trace-main small { color: #e9b8e0; }
 .trace-btns { display: flex; gap: 8px; margin-top: 8px; }
 .trace-btns button { flex: 1; height: 40px; margin: 0; }
+.trace-method { display: flex; gap: 8px; margin-top: 8px; }
+.trace-method[hidden] { display: none; }
+.trace-method button { flex: 1; min-height: 40px; border: 1px solid #e9b8e0; border-radius: 8px; background: transparent; color: #fff; }
+.trace-method button[aria-pressed="true"] { background: #ff2fd0; color: #111; font-weight: 700; }
 .primary.small { height: 40px; margin: 0; }
 body.tracing #topbar, body.tracing #chips { display: none !important; }
+body.tracing #update-bar { display: none; }
 /* draggable dots: a 34px touch target around a smaller visible dot */
 .trace-dot { background: none; border: 0; }
 .trace-dot::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: #ff2fd0; border: 3px solid #fff; box-shadow: 0 1px 4px #0008; }
@@ -461,3 +468,55 @@ body.tracing #topbar, body.tracing #chips { display: none !important; }
 .ride-chart .ch-hit { fill: transparent; cursor: crosshair; }
 .ch-tip { position: absolute; top: -4px; background: #000d; color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 6px; pointer-events: none; white-space: nowrap; }
 .hint.center { text-align: center; }
+
+/* Emergency access stays visible on the map, including while navigating. */
+.fab.sos-fab { background: #b71c1c; color: #fff; font-size: 14px; font-weight: 800; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #ffd400; outline-offset: 3px; }
+/* Update prompts must not cover emergency actions or other sheet controls. */
+.sheet:not([hidden]) ~ #update-bar { display: none; }
+
+/* Riding reserves the center of the map for the trail, in either orientation. */
+#ride-status { position: fixed; top: calc(12px + var(--safe-t)); left: 12px; right: 82px; z-index: 1002;
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #172016eb; border-radius: 12px; }
+#ride-status[hidden] { display: none; }
+#ride-status > div { flex: 1; min-width: 0; }
+#ride-heading { display: block; font-size: 14px; line-height: 1.25; }
+#ride-follow-state { display: block; font-size: 12px; color: #cbd5c7; margin-top: 3px; }
+#btn-enable-compass { min-height: 44px; max-width: 100px; border: 1px solid #a3ab9f; border-radius: 8px; background: transparent; font-size: 12px; padding: 4px 6px; }
+#btn-enable-compass[hidden] { display: none; }
+body.riding #topbar, body.riding #ride-actions, body.riding #scale-info, body.riding #update-bar,
+body.riding #btn-rec, body.riding #btn-layers, body.riding #btn-save { display: none !important; }
+body.riding #chips > :not(#screen-warning):not(#sun-bar):not(#hunt-bar) { display: none; }
+body.riding #chips { top: calc(var(--ride-banner-h, 0px) + 100px + var(--safe-t)); max-width: calc(100vw - 90px); left: 12px; transform: none; }
+body.riding #chips .chip { white-space: normal; max-width: 100%; }
+body.navigating #ride-status { top: calc(var(--ride-banner-h, 110px) + var(--safe-t)); }
+body.riding #fabs { bottom: calc(12px + var(--safe-b)); gap: 8px; }
+body.riding #btn-locate::after { content: 'Follow'; font-size: 10px; line-height: 1; }
+body.riding #btn-locate { grid-template-rows: 30px 12px; }
+body.riding #btn-compass { display: grid; }
+body.riding #ride-dash { bottom: calc(12px + var(--safe-b)); }
+.me-head.last-heading { opacity: .45; }
+@media (orientation: landscape) and (max-height: 550px) {
+  body.riding #fabs { right: calc(8px + env(safe-area-inset-right, 0px)); bottom: calc(8px + var(--safe-b)); gap: 6px; }
+  body.riding .fab { width: 44px; height: 44px; }
+  body.riding .fab svg { width: 22px; height: 22px; }
+  body.riding #btn-locate { grid-template-rows: 24px 12px; }
+  body.riding #nav-banner { left: calc(8px + env(safe-area-inset-left, 0px)); right: 68px; max-width: 430px; border-radius: 10px; }
+  body.riding .nav-main { gap: 8px; padding: 7px 8px; }
+  body.riding .nav-arrow { width: 40px; height: 40px; }
+  body.riding .nav-arrow svg { width: 36px; height: 36px; }
+  body.riding .nav-dist { font-size: 22px; }
+  body.riding .nav-text { font-size: 15px; }
+  body.riding .nav-sub { display: none; }
+  body.riding .nav-end { padding: 10px; }
+  body.riding #ride-dash { left: calc(8px + env(safe-area-inset-left, 0px)); right: auto; bottom: calc(8px + var(--safe-b)); width: 155px; padding: 5px 4px; grid-template-columns: 1fr 1fr; }
+  body.riding #ride-dash > div:nth-child(n+3) { display: none; }
+  body.riding #ride-dash .d-speed b { font-size: 25px; }
+  body.riding #ride-status { top: auto; bottom: calc(8px + var(--safe-b)); left: calc(174px + env(safe-area-inset-left, 0px)); right: calc(68px + env(safe-area-inset-right, 0px)); padding: 5px 8px; min-height: 50px; }
+  body.riding:not(.recording) #ride-status { left: calc(8px + env(safe-area-inset-left, 0px)); }
+  body.riding #ride-heading { font-size: 13px; }
+  body.riding #ride-follow-state { font-size: 11px; }
+  body.riding #chips { top: calc(var(--ride-banner-h, 0px) + 12px); left: calc(8px + env(safe-area-inset-left, 0px)); max-width: 300px; }
+  body.riding #screen-warning { font-size: 11px; padding: 5px 8px; width: 300px; }
+  body.riding .sheet { max-height: calc(100dvh - 16px); }
+}

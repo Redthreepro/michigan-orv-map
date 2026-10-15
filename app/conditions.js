@@ -35,14 +35,17 @@ function countyAt(lat, lng) {
   return null;
 }
 const countyByName = (n) => (COUNTIES || []).map((f) => f.properties).find((p) => p.n === n) || null;
+// some ordinances cover 4-wheel ORVs only (no motorcycles)
+const noBikes = (c) => c && c.nobike && rig === 24;
 function countyLine(c, long) {
   if (!c) return '';
+  if (noBikes(c)) return `${c.n} County roads: not open to dirt bikes (the county ordinance covers 4-wheel ORVs only, ${c.upd}).${long ? ' Confirm with the county sheriff before riding a road.' : ''}`;
   const s = COUNTY_STYLE[c.st] || COUNTY_STYLE.none;
   const when = c.upd ? (c.ok ? ` (county ordinance, ${c.upd})` : ` (reported ${c.upd})`) : '';
   return `${c.n} County roads: ${s.label}${c.note && c.st !== 'none' ? '. ' + c.note : ''}${when}.${long ? ' Confirm with the county sheriff before riding a road.' : ''}`;
 }
 window.countyAt = countyAt;
-window.countyRoadShort = (name) => { const c = countyByName(name); return c ? (COUNTY_STYLE[c.st] || COUNTY_STYLE.none).label + (c.upd ? ` (${c.ok ? 'ordinance' : 'reported'} ${c.upd})` : '') : null; };
+window.countyRoadShort = (name) => { const c = countyByName(name); if (noBikes(c)) return 'not open to dirt bikes'; return c ? (COUNTY_STYLE[c.st] || COUNTY_STYLE.none).label + (c.upd ? ` (${c.ok ? 'ordinance' : 'reported'} ${c.upd})` : '') : null; };
 window.countyRoadText = (lat, lng) => countyLine(countyAt(lat, lng), true);
 window.countySource = (lat, lng) => { const c = countyAt(lat, lng); return c ? c.src : null; };
 

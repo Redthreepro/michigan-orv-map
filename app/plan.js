@@ -47,7 +47,7 @@ async function computePlan({ fit = true, show = true } = {}) {
   if (!plan || !plan.stops.length) return;
   const first = plan.stops[0];
   if (first.mine) {
-    let here = meMarker ? meMarker.getLatLng() : null;
+    let here = currentGpsFix();
     if (!here) {
       ensureGpsFix();
       toast('Getting your GPS location…');
@@ -504,6 +504,8 @@ map.on('contextmenu', (e) => {
   showSignal();
   const ct = window.countyRoadText ? countyRoadText(e.latlng.lat, e.latlng.lng) : '';
   $('#point-county').hidden = !ct; $('#point-county').textContent = ct;
+  const src = ct && window.countySource ? countySource(e.latlng.lat, e.latlng.lng) : null;
+  if (src && /^https:\/\//.test(src)) { const a = document.createElement('a'); a.href = src; a.target = '_blank'; a.rel = 'noopener'; a.textContent = ' Source'; $('#point-county').appendChild(a); }
   if (window.loadCoverage && window.signalAt && signalAt(0, 0) === null) loadCoverage().then(showSignal);
   openSheet('#panel-point');
 });
@@ -525,7 +527,7 @@ function nearestOnPlan(lat, lng) {
       const L2 = dx * dx + dy * dy;
       const t = L2 ? Math.max(0, Math.min(1, (px * dx + py * dy) / L2)) : 0;
       const d = Math.hypot(px - dx * t, py - dy * t);
-      if (d < best.d) best = { d, leg: li, at: r.cum[i] + (r.cum[i + 1] - r.cum[i]) * t };
+      if (d < best.d) best = { d, leg: li, segment: i, at: r.cum[i] + (r.cum[i + 1] - r.cum[i]) * t };
     }
   });
   return best;
@@ -547,7 +549,7 @@ window.onPlanPos = (pos) => {
   if (window.onNavPos) onNavPos(near, pos);
 
   nav.off = near.d > OFF_ROUTE_M ? nav.off + 1 : 0;
-  if (nav.off >= 3 && Date.now() - nav.last > 20000) {
+  if (document.body.classList.contains('navigating') && nav.off >= 3 && Date.now() - nav.last > 20000) {
     nav.off = 0; nav.last = Date.now();
     const redo = planLeg(L.latLng(lat, lng), L.latLng(next));
     if (!redo.fail) {
@@ -568,7 +570,8 @@ function waitForFix(ms) {
   return new Promise((resolve) => {
     const t0 = Date.now();
     const iv = setInterval(() => {
-      if (meMarker) { clearInterval(iv); resolve(meMarker.getLatLng()); }
+      const fix = currentGpsFix();
+      if (fix) { clearInterval(iv); resolve(L.latLng(fix.lat, fix.lng)); }
       else if (Date.now() - t0 > ms) { clearInterval(iv); resolve(null); }
     }, 300);
   });

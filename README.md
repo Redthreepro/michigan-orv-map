@@ -61,12 +61,29 @@ roads open to ORVs (shown from zoom 10 in).
 - **Ride mode** ("Start riding" on a trip): next-turn banner (trail changes and real junction turns, noise
   filtered), distance countdown, miles left, arrival and next-leg handoff, auto zoom near turns,
   heading-up map (compass button toggles north-up), rerouting. No voice. Uses vendored leaflet-rotate.
+- **Follow while riding**: recording or resuming recenters the map. Drag to look around; follow resumes
+  15 seconds after you release the map (unless a sheet is open or recording is paused). The Follow
+  button recenters immediately. Heading-up also works when recording without a route. Travel direction
+  comes from GPS course or sufficient movement; Enable compass requests iPhone compass permission for
+  direction while stopped. Last travel and unknown/stale readings are labeled rather than presented as
+  a live compass. Actual junction decisions, including going straight, remain in the turn instructions.
+  Landscape uses a compact turn banner, speed/distance, and four primary controls; More opens the rest.
 - **Ride every trail**: all saved rides are matched against the DNR routes/trails your machine may ride
   (35 m tolerance, 50 m checks, ride line filled between GPS points). Ridden parts show in gold; the Rides
   panel shows overall % and a per-trail list; "All my rides" layer and one combined GPX.
 - **Fix a ride by hand**: Edit → "Add a missed section" (forgot to start, phone died) or "Trace a ride by hand".
-  Tap points; it follows the trails between taps. Added sections count toward miles and the trail goal but
-  not ride time, are marked "added by hand", and can be removed.
+  Edit also lists possible recording gaps and opens a preview between their recorded endpoints.
+  "Follow trails" keeps the complete mapped route, including long loops; add points or drag the midpoint
+  handles to choose where you actually rode. Unconnected stretches are red and cannot be saved as a
+  mapped route. "Draw by hand" lets you trace missing/unmapped paths explicitly. "Save full section"
+  saves the entire preview. Added sections count continuously toward miles and the trail goal but
+  not ride time, are marked "added by hand", and can be edited or removed. Filling a detected gap
+  retains every GPS point while removing the invented straight connection across the interruption.
+  Previously saved hand-added sections also benefit from continuous trail-progress matching.
+- **Screen awake**: recording and navigation request a screen wake lock, retry when the phone releases
+  it, and show a persistent warning if unavailable. Keep the app visible; this PWA cannot promise
+  background GPS or recording while the phone is locked. Long GPS interruptions create separate
+  recorded segments so they can be reconstructed rather than counted as a straight recorded path.
 - **Ride details** (tap a ride's name): distance, moving/total time, avg moving & top speed, climbing,
   elevation and speed charts (tap/drag for values), and the trails that ride covered.
 - **Bonus goal: forest roads** — state + national forest roads ridden, counted separately from the trail goal.
@@ -95,6 +112,11 @@ Bumps the offline cache version and the `?v=` on script/style tags so phones and
 
 ```
 node tools/check-names.js
+node --test tests/*.test.cjs
 ```
 
 All app scripts share one global scope; this catches a name defined in two files (which silently breaks things).
+
+The regression tests use Node's built-in test runner, without installing packages. They cover SOS location provenance and freshness, pending/failed family alerts and cancellation, check-ins, offline shell updates, storage failures, and navigation GPS. Run these checks before deploying; GitHub Actions also runs them for pull requests and deployments.
+
+SOS accepts recent GPS fixes (30 seconds or less), or a map-center location explicitly confirmed and labeled as manually selected. Without either, calls, text drafts, sharing, and family alerts remain available without coordinates. A family alert stays pending until the server acknowledges its write; acknowledgement does not mean a family member has read it. GPS works offline; sharing still requires an available messaging or network service. Text-to-911 guidance follows the [National 911 Program](https://www.911.gov/calling-911/frequently-asked-questions/).
