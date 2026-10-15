@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="style.css?v=63">
+<link rel="stylesheet" href="style.css?v=64">
 </head>
 <body>
 <div id="map"></div>
@@ -58,6 +58,7 @@
 </div>
 
 <div id="fabs">
+  <button id="btn-ride-tools" class="fab ride-tools-button" hidden aria-label="Ride tools">More</button>
   <button id="btn-sos" class="fab sos-fab" aria-label="SOS / emergency">SOS</button>
   <button id="btn-compass" class="fab" hidden aria-label="Heading up or north up">
     <svg viewBox="0 0 24 24"><path d="M12 2 8 12h8z" fill="#e53935"/><path d="M12 22 8 12h8z" fill="currentColor"/></svg>
@@ -77,6 +78,10 @@
 </div>
 
 <div id="scale-info"></div>
+<div id="ride-status" hidden>
+  <div><b id="ride-heading">Direction unknown</b><small id="ride-follow-state"></small></div>
+  <button id="btn-enable-compass">Enable compass</button>
+</div>
 
 <div id="photo-view" hidden><figure><img alt=""><figcaption></figcaption></figure><span class="pv-close">&times;</span></div>
 <div id="ride-dash" hidden>
@@ -338,28 +343,29 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/leaflet-rotate.js"></script>
-<script src="app.js?v=63"></script>
-<script src="tracks.js?v=63"></script>
-<script src="routing.js?v=63"></script>
-<script src="places.js?v=63"></script>
-<script src="plan.js?v=63"></script>
-<script src="nav.js?v=63"></script>
-<script src="offline.js?v=63"></script>
-<script src="gpx.js?v=63"></script>
-<script src="weather.js?v=63"></script>
-<script src="progress.js?v=63"></script>
-<script src="details.js?v=63"></script>
-<script src="edit.js?v=63"></script>
-<script src="select.js?v=63"></script>
-<script src="updates.js?v=63"></script>
-<script src="laws.js?v=63"></script>
-<script src="safety.js?v=63"></script>
-<script src="merge.js?v=63"></script>
-<script src="spots.js?v=63"></script>
-<script src="cloud.js?v=63"></script>
-<script src="colors.js?v=63"></script>
-<script src="loops.js?v=63"></script>
-<script src="conditions.js?v=63"></script>
-<script src="stats.js?v=63"></script>
+<script src="app.js?v=64"></script>
+<script src="tracks.js?v=64"></script>
+<script src="routing.js?v=64"></script>
+<script src="places.js?v=64"></script>
+<script src="plan.js?v=64"></script>
+<script src="rideview.js?v=64"></script>
+<script src="nav.js?v=64"></script>
+<script src="offline.js?v=64"></script>
+<script src="gpx.js?v=64"></script>
+<script src="weather.js?v=64"></script>
+<script src="progress.js?v=64"></script>
+<script src="details.js?v=64"></script>
+<script src="edit.js?v=64"></script>
+<script src="select.js?v=64"></script>
+<script src="updates.js?v=64"></script>
+<script src="laws.js?v=64"></script>
+<script src="safety.js?v=64"></script>
+<script src="merge.js?v=64"></script>
+<script src="spots.js?v=64"></script>
+<script src="cloud.js?v=64"></script>
+<script src="colors.js?v=64"></script>
+<script src="loops.js?v=64"></script>
+<script src="conditions.js?v=64"></script>
+<script src="stats.js?v=64"></script>
 </body>
 </html>

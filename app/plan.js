@@ -527,7 +527,7 @@ function nearestOnPlan(lat, lng) {
       const L2 = dx * dx + dy * dy;
       const t = L2 ? Math.max(0, Math.min(1, (px * dx + py * dy) / L2)) : 0;
       const d = Math.hypot(px - dx * t, py - dy * t);
-      if (d < best.d) best = { d, leg: li, at: r.cum[i] + (r.cum[i + 1] - r.cum[i]) * t };
+      if (d < best.d) best = { d, leg: li, segment: i, at: r.cum[i] + (r.cum[i + 1] - r.cum[i]) * t };
     }
   });
   return best;
@@ -549,7 +549,7 @@ window.onPlanPos = (pos) => {
   if (window.onNavPos) onNavPos(near, pos);
 
   nav.off = near.d > OFF_ROUTE_M ? nav.off + 1 : 0;
-  if (nav.off >= 3 && Date.now() - nav.last > 20000) {
+  if (document.body.classList.contains('navigating') && nav.off >= 3 && Date.now() - nav.last > 20000) {
     nav.off = 0; nav.last = Date.now();
     const redo = planLeg(L.latLng(lat, lng), L.latLng(next));
     if (!redo.fail) {

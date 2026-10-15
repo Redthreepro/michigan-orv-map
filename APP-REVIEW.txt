@@ -137,3 +137,34 @@ recording after a phone is locked. Real-device sleep/resume testing remains need
 43 regression tests pass. The browser repair walkthrough uses the synthetic
 tests/fixtures/recording-gap.gpx; the rider's real ride has not been accessed or
 modified. Changes remain local until deployed.
+
+Follow-up: following, junction guidance and horizontal riding
+
+Recording and resume now enable follow, and the location control cannot turn it
+off during a ride. Dragging enters temporary browsing; after 15 seconds without
+dragging, a fresh fix recenters the map unless a sheet is open or recording is
+paused. Follow remains available immediately. GPS/recording/paused status stays
+visible in the compact ride view.
+
+Shared heading-up works for recording without a planned route. GPS course or
+sufficient accurate displacement supplies travel direction; permission-gated
+iPhone compass readings supply phone direction at stops. Screen orientation,
+zero/north, uncalibrated readings and expiry are handled. Last travel is labeled
+and holds map orientation rather than making a stopped map suddenly flip north.
+Actual iPhone compass calibration and magnetic-mount behavior still need a ride test.
+
+Real junction maneuvers survive noise filtering, including straight-through
+decisions and closely spaced turns. A turn remains visible close to its junction.
+Reliable travel opposite the planned direction produces a direction warning.
+An off-route fix projected onto an endpoint cannot announce arrival. Rerouting
+is limited to active navigation rather than changing a trip during casual recording.
+
+Horizontal ride controls are compact: a turn card, speed/distance, heading/status,
+and More / SOS / compass / Follow. The center of the map stays visible; the
+secondary tools remain available under More. In the local 844x390 replay, the
+rendered location-dot center and map center were both [422,195]. Portrait was
+also checked. The replay uses synthetic GPS on a development-only local server.
+
+Native iPhone background recording is planned in store/IPHONE-TRACKING-PLAN.txt.
+The developer account is available; Mac/Xcode access and physical-device tests
+remain to be established. A native recorder has not been built or claimed working.

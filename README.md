@@ -61,6 +61,13 @@ roads open to ORVs (shown from zoom 10 in).
 - **Ride mode** ("Start riding" on a trip): next-turn banner (trail changes and real junction turns, noise
   filtered), distance countdown, miles left, arrival and next-leg handoff, auto zoom near turns,
   heading-up map (compass button toggles north-up), rerouting. No voice. Uses vendored leaflet-rotate.
+- **Follow while riding**: recording or resuming recenters the map. Drag to look around; follow resumes
+  15 seconds after you release the map (unless a sheet is open or recording is paused). The Follow
+  button recenters immediately. Heading-up also works when recording without a route. Travel direction
+  comes from GPS course or sufficient movement; Enable compass requests iPhone compass permission for
+  direction while stopped. Last travel and unknown/stale readings are labeled rather than presented as
+  a live compass. Actual junction decisions, including going straight, remain in the turn instructions.
+  Landscape uses a compact turn banner, speed/distance, and four primary controls; More opens the rest.
 - **Ride every trail**: all saved rides are matched against the DNR routes/trails your machine may ride
   (35 m tolerance, 50 m checks, ride line filled between GPS points). Ridden parts show in gold; the Rides
   panel shows overall % and a per-trail list; "All my rides" layer and one combined GPX.

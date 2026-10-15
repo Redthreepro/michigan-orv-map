@@ -160,6 +160,7 @@ async function startRec() {
   catch { toast('Recording could not start: phone storage is unavailable. Free space and try again.'); return; }
   finally { recStarting = false; }
   ensureGps();
+  if (window.resumeRideFollow) resumeRideFollow();
   lockScreen();
   refreshRecUi();
   toast('Recording. Keep the app open and check that your screen stays on.');
@@ -172,6 +173,7 @@ function pauseRec() {
 }
 function resumeRec() {
   rec.paused = false; rec.segs.push([]); putTrack(rec); ensureGps(); lockScreen(); refreshRecUi();
+  if (window.resumeRideFollow) resumeRideFollow();
   if (window.cloudRide) cloudRide('riding');
 }
 async function stopRec() {
@@ -205,6 +207,7 @@ const recBar = $('#rec-bar');
 
 function refreshRecUi() {
   refreshRideActions();
+  if (window.refreshRideView) refreshRideView();
   recBtn.classList.toggle('rec', !!rec && !rec.paused);
   recBtn.classList.toggle('paused', !!rec && rec.paused);
   recBar.hidden = !rec;

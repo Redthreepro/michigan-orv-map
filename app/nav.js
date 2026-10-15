@@ -1,10 +1,9 @@
 'use strict';
 // Riding a planned route: next-turn banner, heading-up map, auto zoom, arrival. No voice.
 
-const ride = { on: false, headingUp: store.get('headingUp', true), lastUserZoom: 0, autoZoom: false, heading: null };
+const ride = { on: false, headingUp: store.get('headingUp', true), lastUserZoom: 0, autoZoom: false };
 const TURN_SAMPLE_M = 25;   // look this far back/ahead to measure a turn
 const MIN_RUN_M = 300;      // a trail stretch shorter than this isn't worth its own instruction
-const JUNCTION_TURN_DEG = 60;  // only real turns at junctions when you stay on the same trail
 const GENERIC_MAX_M = 1600;   // unnamed forest-road stretches shorter than this are just the route running on the road
 const GENERIC = /^(State forest road|National forest road|trail)$/;
 
@@ -31,6 +30,20 @@ function nodeAtLegStart(leg) {
   const c = G.geom[leg.e];
   const [lat, lng] = leg.coords[0];
   return Math.abs(c[1] / 1e5 - lat) < 1e-5 && Math.abs(c[0] / 1e5 - lng) < 1e-5 ? G.eu[leg.e] : G.ev[leg.e];
+}
+function isRideJunction(node) {
+  const edges = G.adj[node].filter(allowed);
+  if (edges.length < 3) return false;
+  const exits = [];
+  for (const edge of edges) {
+    let points = edgeCoords(edge);
+    if (G.eu[edge] !== node) points = points.reverse();
+    const next = points.find((p) => hav(points[0][0], points[0][1], p[0], p[1]) > 5);
+    if (!next) continue;
+    const heading = bearingDeg(points[0], next);
+    if (!exits.some((angle) => Math.abs(((heading - angle + 540) % 360) - 180) < 20)) exits.push(heading);
+  }
+  return exits.length >= 3;
 }
 
 function maneuvers(r, dest) {
@@ -65,7 +78,8 @@ function maneuvers(r, dest) {
     runs.forEach((run, i) => {
       if (i > 0) {
         const d = turnAt(r, run.startIdx);
-        out.push({ at: r.cum[run.startIdx], deg: d, text: `${turnWords(d)} onto ${run.label}` });
+        const junction = isRideJunction(nodeAtLegStart(r.legs[run.legs[0]]));
+        out.push({ at: r.cum[run.startIdx], deg: d, junction, text: `${turnWords(d)} onto ${run.label}` });
       }
       // real junctions inside a stretch where you turn to stay on the same trail
       let pos = run.startIdx;
@@ -73,10 +87,9 @@ function maneuvers(r, dest) {
         const leg = r.legs[k];
         if (pos > run.startIdx && k > 0) {
           const node = nodeAtLegStart(leg);
-          const branches = G.adj[node].filter(allowed).length;
           const d = turnAt(r, pos);
-          if (branches >= 3 && Math.abs(d) >= JUNCTION_TURN_DEG && !out.some((m) => Math.abs(m.at - r.cum[pos]) < 60)) {
-            out.push({ at: r.cum[pos], deg: d, text: `${turnWords(d)} to stay on ${run.label}` });
+          if (isRideJunction(node) && !out.some((m) => Math.abs(m.at - r.cum[pos]) < 10)) {
+            out.push({ at: r.cum[pos], deg: d, junction: true, text: `${turnWords(d)} at junction to stay on ${run.label}` });
           }
         }
         pos += leg.coords.length;
@@ -94,17 +107,17 @@ function tidy(list) {
   const out = [];
   const end = list.length ? list[list.length - 1].at : 0;
   // skip turns in the first few yards and right on top of the arrival
-  for (const m of list.filter((x) => x.type || (x.at > 30 && end - x.at > 60))) {
+  for (const m of list.filter((x) => x.type || x.junction || (x.at > 30 && end - x.at > 60))) {
     const prev = out[out.length - 1];
     // a right-then-left (or left-then-right) jog across a road within ~500 ft cancels out
-    if (prev && !m.type && !prev.type && m.at - prev.at < 160 && Math.abs(prev.deg + m.deg) < 30
+    if (prev && !m.junction && !prev.junction && !m.type && !prev.type && m.at - prev.at < 160 && Math.abs(prev.deg + m.deg) < 30
         && /stay on/.test(prev.text) && /stay on/.test(m.text)) { out.pop(); continue; }
-    if (prev && !m.type && !prev.type && m.at - prev.at < 80) {
+    if (prev && !m.junction && !prev.junction && !m.type && !prev.type && m.at - prev.at < 80) {
       if (/onto/.test(m.text) || (!/onto/.test(prev.text) && Math.abs(m.deg) > Math.abs(prev.deg))) out[out.length - 1] = m;
       continue;
     }
     // "Continue onto X" at a gentle bend is only worth saying when X is a named trail
-    if (!m.type && Math.abs(m.deg) < 25 && GENERIC.test(m.text.replace(/^Continue onto /, ''))) continue;
+    if (!m.junction && !m.type && Math.abs(m.deg) < 25 && GENERIC.test(m.text.replace(/^Continue onto /, ''))) continue;
     out.push(m);
   }
   return out;
@@ -122,6 +135,7 @@ function setBanner({ icon, deg = 0, dist, text, sub }) {
   b.querySelector('.nav-dist').textContent = dist || '';
   b.querySelector('.nav-text').textContent = text;
   b.querySelector('.nav-sub').textContent = sub || '';
+  if (window.refreshRideView) refreshRideView();
 }
 
 window.onNavPos = (near, pos) => {
@@ -131,18 +145,26 @@ window.onNavPos = (near, pos) => {
   const dest = plan.stops[near.leg + 1].name;
   if (!r.man) r.man = maneuvers(r, dest);
   const legLen = r.cum[r.cum.length - 1] || 0;
-  const next = r.man.find((m) => m.at > near.at + 10) || r.man[r.man.length - 1];
+  const next = r.man.find((m) => m.at >= near.at - 12) || r.man[r.man.length - 1];
   const dist = Math.max(0, next.at - near.at);
   const off = near.d > OFF_ROUTE_M;
+  const direction = window.rideDirection && rideDirection();
+  const segment = near.segment;
+  const routeHeading = segment != null && r.path[segment + 1] ? bearingDeg(r.path[segment], r.path[segment + 1]) : null;
+  const reverse = !off && pos.coords.accuracy <= 30 && direction && direction.source === 'travel' && routeHeading != null
+    && Math.abs(((direction.heading - routeHeading + 540) % 360) - 180) > 120;
 
-  if (next.type !== 'gap' && legLen - near.at < 40) {
+  const destination = plan.stops[near.leg + 1];
+  const destinationDistance = hav(pos.coords.latitude, pos.coords.longitude, destination.lat, destination.lng);
+  if (!off && next.type !== 'gap' && legLen - near.at < 40 && destinationDistance < 40) {
     const more = planLegs[near.leg + 1];
     setBanner({ icon: 'flag', text: `Arrived at ${dest}`,
       sub: more ? `Next: ${fmtMi(more.meters)} to ${plan.stops[near.leg + 2].name}` : 'End of your route' });
   } else {
     const after = r.man[r.man.indexOf(next) + 1];
     setBanner({
-      icon: next.type ? 'flag' : 'arrow', deg: next.deg, dist: fmtNavDist(dist), text: next.text,
+      icon: next.type ? 'flag' : 'arrow', deg: next.deg, dist: fmtNavDist(dist), text: off ? 'Off route · check the blue line'
+        : reverse ? 'Check direction · route runs behind you' : next.text,
       sub: off && near.at < 30 ? `The route starts at the nearest trail you can ride, ${fmtNavDist(near.d)} away.`
         : off ? 'Off route. Head back to the blue line; a new route comes if you keep going.'
         : after && after.at - next.at < 300 ? `Then ${after.text.charAt(0).toLowerCase()}${after.text.slice(1)}`
@@ -156,10 +178,8 @@ window.onNavPos = (near, pos) => {
     if (map.getZoom() !== want) { ride.autoZoom = true; map.setZoom(want); }
   }
 
-  // heading-up: turn the map so your direction of travel points up (only when moving)
-  const { heading, speed } = pos.coords;
-  if (heading != null && !isNaN(heading) && speed > 1.5) ride.heading = heading;
-  if (ride.headingUp && follow && ride.heading != null && map.setBearing) map.setBearing(-ride.heading);
+  // Recording-only and route navigation share compass/course handling.
+  if (window.refreshRideView) refreshRideView();
   updateCompass();
 };
 
@@ -173,15 +193,17 @@ function startNav() {
   document.body.classList.add('navigating');
   lockScreen();
   $('#nav-banner').hidden = false;
-  setBanner({ icon: 'arrow', text: 'Waiting for GPS…', sub: 'Keep the screen on while you ride. Set Auto-Lock to Never.' });
+  setBanner({ icon: 'arrow', text: 'Waiting for GPS…', sub: 'The map follows you. Enable the phone compass for direction while stopped.' });
   closeSheets();
   ensureGpsFix();
   follow = true;
+  followPausedAt = 0;
   setLocState();
   // our own zooms (plan fit, this one) aren't "you zoomed", so auto zoom starts right away
   if (meMarker) { ride.autoZoom = true; map.setView(meMarker.getLatLng(), 15); }
   ride.lastUserZoom = 0;
   updateCompass();
+  if (window.resumeRideFollow) resumeRideFollow();
 }
 function stopNav() {
   ride.on = false;
@@ -190,6 +212,7 @@ function stopNav() {
   $('#nav-banner').hidden = true;
   if (map.setBearing) map.setBearing(0);
   updateCompass();
+  if (window.refreshRideView) refreshRideView();
 }
 window.startNav = startNav;
 $('#nav-banner .nav-end').addEventListener('click', (e) => { e.stopPropagation(); stopNav(); });
@@ -199,17 +222,18 @@ $('#nav-banner').addEventListener('click', () => showPlan());
 function updateCompass() {
   const btn = $('#btn-compass');
   const bearing = map.getBearing ? map.getBearing() : 0;
-  btn.hidden = !ride.on && Math.abs(bearing) < 0.5;
-  btn.classList.toggle('on', ride.on && ride.headingUp);
+  const active = !!(window.rideViewActive && rideViewActive());
+  btn.hidden = !active && Math.abs(bearing) < 0.5;
+  btn.classList.toggle('on', active && store.get('headingUp', true));
   btn.querySelector('svg').style.transform = `rotate(${bearing}deg)`; // needle keeps pointing north
 }
 $('#btn-compass').addEventListener('click', () => {
-  if (!ride.on) { if (map.setBearing) map.setBearing(0); return updateCompass(); }
-  ride.headingUp = !ride.headingUp;
+  if (!(window.rideViewActive && rideViewActive())) { if (map.setBearing) map.setBearing(0); return updateCompass(); }
+  ride.headingUp = !store.get('headingUp', true);
   store.set('headingUp', ride.headingUp);
   if (!ride.headingUp && map.setBearing) map.setBearing(0);
-  else if (ride.heading != null && map.setBearing) map.setBearing(-ride.heading);
   toast(ride.headingUp ? 'Heading up: the map turns as you ride' : 'North up');
   updateCompass();
+  if (window.refreshRideView) refreshRideView();
 });
 map.on('rotate', updateCompass);

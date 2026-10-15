@@ -1,0 +1,57 @@
+Native iPhone tracking direction — October 14, 2026
+
+The Apple Developer account is available. Mac/Xcode access, bundle identifier,
+signing team, deployment target and TestFlight setup still need to be established.
+This is an implementation plan, not a functioning native recorder.
+
+Recommended boundary
+Keep the existing offline map, routing, repair, navigation and sharing UI. Add a
+native iPhone host whose location recorder owns the ride independently of the
+web view. A wrapper that merely keeps running navigator.geolocation is not the
+screen-off solution. Native code must save updates even when JavaScript stops.
+
+Recorder responsibilities
+- Explicit Start, Pause, Resume and Stop session states, with stable ride and
+  point IDs and a durable native database. Commit incoming points before
+  notifying the map. A network connection must not be needed to save a ride.
+- Native location updates, their timestamps, accuracy, course, elevation and
+  speed. Preserve raw accepted points and record interruption boundaries.
+- Permission and background-session state visible in the app, with an explicit
+  recording indicator and a way to stop tracking. Request only the authorization
+  needed for an intentional active ride; do not promise tracking after force quit.
+- Foreground catch-up into the map with acknowledgement/deduplication. Resuming
+  the web view must not duplicate mileage or overwrite a newer native recording.
+- Export/backup of the native ride without depending on the web view's storage.
+
+Map integration
+Use one location-source adapter. In a browser it consumes web GPS; inside the
+native app it consumes native fixes. Do not run both recorders for the same ride.
+Preserve manually reconstructed sections and their provenance when reconciling
+native GPS points. Family sharing remains a separate queue; a saved native point
+does not imply a family update was delivered.
+
+Phone heading and horizontal use
+Native course is travel direction. Native compass is phone direction; adapt it
+to the current screen orientation and check reported accuracy. Use the same
+clear Travel / Phone compass / Last travel / Unknown labels as the web ride view.
+Keep the native recording session independent of phone orientation and UI reloads.
+
+Apple requirements checked
+Apple documents the Location updates background capability, background activity
+sessions, authorization/service sessions and restart handling for native Core
+Location. Xcode builds require supported macOS. Select actual APIs and OS targets
+on the Mac rather than assuming the developer account alone changes PWA behavior.
+
+First TestFlight acceptance ride
+Record a known loop with the screen visible, then locked for 15–30 minutes;
+repeat with no cellular data, phone rotation, navigation and recording-only mode,
+app switching, low-power mode, temporary GPS loss, an incoming call, and restart.
+Compare exported timestamps, path continuity and distance against a reference
+recorder. Confirm stop/pause behavior, duplicate-free catch-up and battery use.
+Test permission denial/revocation and storage failures. Report interruptions
+honestly rather than joining unknown paths with invented GPS lines.
+
+Sources
+https://developer.apple.com/documentation/corelocation/handling-location-updates-in-the-background
+https://developer.apple.com/documentation/corelocation/getting-heading-and-course-information
+https://developer.apple.com/xcode/system-requirements

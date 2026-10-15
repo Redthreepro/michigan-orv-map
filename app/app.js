@@ -387,6 +387,7 @@ search.addEventListener('input', () => {
 // ---------- GPS ----------
 let watchId = null, follow = false, meMarker = null, meCircle = null;
 let gpsFix = null;
+let followPausedAt = 0;
 // A visible marker may be an old fix after the phone resumes or loses GPS.
 const GPS_FRESH_MS = 30000;
 function validLocation(p) {
@@ -402,6 +403,8 @@ const meIcon = () => L.divIcon({ className: 'me-wrap', html: '<div class="me-hea
 function setLocState() {
   locBtn.classList.toggle('on', watchId !== null && !follow);
   locBtn.classList.toggle('follow', watchId !== null && follow);
+  locBtn.setAttribute('aria-label', watchId !== null ? follow ? 'Following your location' : 'Recenter and follow' : 'My location');
+  if (window.refreshRideView) refreshRideView();
 }
 function onPos(pos) {
   const { latitude: lat, longitude: lng, accuracy, heading, speed, altitude } = pos.coords;
@@ -414,7 +417,7 @@ function onPos(pos) {
     map.setView(ll, Math.max(map.getZoom(), 14));
   } else {
     meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(accuracy);
-    if (follow) map.panTo(ll, { animate: true });
+    if (follow) map.panTo(ll, { animate: false });
   }
   const head = meMarker.getElement()?.querySelector('.me-head');
   if (head) {
@@ -428,6 +431,7 @@ function onPos(pos) {
   $('#scale-info').textContent = bits.join(' · ');
   if (window.onTrackPos) window.onTrackPos(pos);
   if (window.cloudFix) window.cloudFix(pos);
+  if (window.onRideFix) onRideFix(pos);
   if (window.onPlanPos) window.onPlanPos(pos);
   window.dispatchEvent(new Event('gpschange'));
 }
@@ -450,16 +454,17 @@ locBtn.addEventListener('click', () => {
     watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
   } else if (!follow) {
     follow = true;
+    followPausedAt = 0;
     if (meMarker) map.setView(meMarker.getLatLng(), Math.max(map.getZoom(), 14));
   } else if ((window.isRecording && window.isRecording()) || document.body.classList.contains('navigating')) {
-    follow = false;
-    toast('GPS stays on while recording or navigating');
+    // While riding this control always recenters; it must never disable follow.
+    if (meMarker) map.panTo(meMarker.getLatLng(), { animate: false });
   } else {
     stopLocate();
   }
   setLocState();
 });
-map.on('dragstart', () => { if (follow) { follow = false; setLocState(); } });
+map.on('dragstart', () => { if (follow) { follow = false; followPausedAt = Date.now(); setLocState(); } });
 
 // ---------- misc ----------
 let toastT;

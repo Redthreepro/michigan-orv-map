@@ -14,6 +14,7 @@ function harness() {
       innerHTML: '', textContent: '', hidden: true, disabled: false, style: {}, dataset: {},
       classList: { contains: () => false, toggle() {}, add() {}, remove() {} },
       addEventListener(name, fn) { this[name] = fn; },
+      setAttribute(key, value) { this[key] = value; },
       querySelector: (selector) => node(key + ' ' + selector),
     });
     return nodes.get(key);
@@ -235,7 +236,7 @@ test('GPS cannot be switched off by the location button during navigation', () =
   const h = harness(); h.run('watchId = 1; follow = true;');
   h.context.document.body.classList.contains = (name) => name === 'navigating';
   h.node('#btn-locate').clickHandler();
-  assert.equal(h.run('watchId'), 1); assert.equal(h.run('follow'), false);
+  assert.equal(h.run('watchId'), 1); assert.equal(h.run('follow'), true);
 });
 
 test('storage rejection prevents recording from claiming it started', async () => {
